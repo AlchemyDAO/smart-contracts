@@ -3,7 +3,7 @@
 Repository for the Alchemy Contracts
 
 ## Dapps
-You can find the rinkeby version of the Alchemy Dapp here: [https://rinkeby.alchemy.keychain.me/](https://rinkeby.alchemy.keychain.me/)
+You can find the rinkeby version of the Alchemy Dapp here: [https://rinkeby.alchemydao.com/](https://rinkeby.alchemydao.com)
 
 # Setup
 
