@@ -18,16 +18,16 @@ contract Alchemy is IERC20 {
     using Address for address;
 
     // presenting the total supply
-    uint256 private _totalSupply;
+    uint256 internal _totalSupply;
 
     // representing the name of the governance token
-    string public _name;
+    string internal _name;
 
     // representing the symbol of the governance token
-    string public _symbol;
+    string internal _symbol;
 
     // representing the decimals of the governance token
-    uint8 public immutable _decimals = 18;
+    uint8 internal immutable _decimals = 18;
 
     // a record of balance of a specific account by address
     mapping(address => uint256) private _balances;
@@ -169,8 +169,8 @@ contract Alchemy is IERC20 {
         require(_sharesForSale >= amount, "low shares");
         require(msg.value >= amount.mul(_buyoutPrice).div(_totalSupply), "low value");
 
-        _balances[msg.sender] += amount;
-        _sharesForSale -= amount;
+        _balances[msg.sender] = _balances[msg.sender].add(amount);
+        _sharesForSale = _sharesForSale.sub(amount);
 
         msg.sender.transfer(msg.value - amount.mul(_buyoutPrice).div(_totalSupply));
     }
@@ -186,7 +186,7 @@ contract Alchemy is IERC20 {
         uint256 balance = _balances[msg.sender];
         _balances[msg.sender] = 0;
 
-        uint256 cost = msg.value.sub(_buyoutPrice.mul((_totalSupply.sub(balance)).div(_totalSupply)));
+        uint256 changeMoney = msg.value.sub(_buyoutPrice.mul((_totalSupply.sub(balance)).div(_totalSupply)));
         _burn(balance);
 
         for (uint i=1; i<=_nftCount; i++) {
@@ -197,7 +197,7 @@ contract Alchemy is IERC20 {
         address payable factoryowner = IAlchemyFactory(_factoryContract).getFactoryOwner();
         IAlchemyRouter(factoryowner).deposit{value:_buyoutPrice / 200}();
 
-        msg.sender.transfer(cost);
+        msg.sender.transfer(changeMoney);
         emit Transfer(msg.sender, address(0), balance);
     }
 
@@ -263,7 +263,7 @@ contract Alchemy is IERC20 {
         require(_raisedNftArray[nftarrayid].forSale, "Not for sale");
         require(msg.value >= _raisedNftArray[nftarrayid].price, "Price too low");
 
-        uint256 cost = msg.value.sub(_raisedNftArray[nftarrayid].price);
+        uint256 changeMoney = msg.value.sub(_raisedNftArray[nftarrayid].price);
         _raisedNftArray[nftarrayid].nftaddress.transferFrom(address(this), msg.sender, _raisedNftArray[nftarrayid].tokenid);
 
         // Take 0.5% fee
@@ -272,7 +272,7 @@ contract Alchemy is IERC20 {
 
         _nftCount--;
         delete _raisedNftArray[nftarrayid];
-        msg.sender.transfer(cost);
+        msg.sender.transfer(changeMoney);
     }
 
     /**
@@ -284,7 +284,15 @@ contract Alchemy is IERC20 {
     */
     function addNft(address new_nft, uint256 tokenid) external{
         require(msg.sender == _timelock, "ALC:Only TL");
-                _nftCount++;
+
+        for(uint256 i=1; i<= _nftCount; i++){
+            address tempAddr   = address(_raisedNftArray[_nftCount].nftaddress);
+            uint256 tempTokenId = _raisedNftArray[_nftCount].tokenid;
+
+            require( !((tempAddr == new_nft) && (tempTokenId == tokenid)), "ALC: Cant add duplicate NFT");
+        }
+
+        _nftCount++;
         _raisedNftArray[_nftCount].nftaddress = IERC721(new_nft);
         _raisedNftArray[_nftCount].tokenid = tokenid;
     }
@@ -296,7 +304,6 @@ contract Alchemy is IERC20 {
         require(msg.sender == _timelock, "ALC:Only TL");
 
         _raisedNftArray[1].nftaddress.transferFrom(address(this), _owner, _raisedNftArray[1].tokenid);
-
         _nftCount--;
         delete _raisedNftArray[1];
     }
@@ -366,8 +373,7 @@ contract Alchemy is IERC20 {
     * @dev See {IERC20-balanceOf}. Uses burn abstraction for balance updates without gas and universally.
     */
     function balanceOf(address account) public override view returns (uint256) {
-        return
-        (_balances[account] * _totalSupply) / (_totalSupply);
+        return _balances[account];
     }
 
     /**
