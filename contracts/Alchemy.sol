@@ -206,8 +206,7 @@ contract Alchemy is IERC20 {
     *
     * @param amount the amount to be burned
     */
-    function burnSharesForSale(uint256 amount) external {
-        require(msg.sender == _timelock, "Only TL");
+    function burnSharesForSale(uint256 amount) onlyTimeLock external {
         require(_sharesForSale >= amount, "Low shares");
 
         _burn(amount);
@@ -221,9 +220,7 @@ contract Alchemy is IERC20 {
     *
     * @param amount the amount to be minted
     */
-    function mintSharesForSale(uint256 amount) external {
-        require(msg.sender == _timelock, "Only TL");
-
+    function mintSharesForSale(uint256 amount) onlyTimeLock external {
         _totalSupply += amount;
         _sharesForSale += amount;
 
@@ -235,8 +232,7 @@ contract Alchemy is IERC20 {
     *
     * @param amount to set the new price
     */
-    function changeBuyoutPrice(uint256 amount) external {
-        require(msg.sender == _timelock, "Only TL");
+    function changeBuyoutPrice(uint256 amount) onlyTimeLock external {
         _buyoutPrice = amount;
     }
 
@@ -247,9 +243,7 @@ contract Alchemy is IERC20 {
     * @param price the buyout price for the specific nft
     * @param sale bool indicates the sale status
     */
-    function setNftSale(uint256 nftarrayid, uint256 price, bool sale) external {
-        require(msg.sender == _timelock, "Only TL");
-
+    function setNftSale(uint256 nftarrayid, uint256 price, bool sale) onlyTimeLock external {
         _raisedNftArray[nftarrayid].forSale = sale;
         _raisedNftArray[nftarrayid].price = price;
     }
@@ -282,9 +276,7 @@ contract Alchemy is IERC20 {
     * @param new_nft the address of the new nft
     * @param tokenid the if of the nft token
     */
-    function addNft(address new_nft, uint256 tokenid) external{
-        require(msg.sender == _timelock, "ALC:Only TL");
-
+    function addNft(address new_nft, uint256 tokenid) onlyTimeLock external{
         for(uint256 i=1; i<= _nftCount; i++){
             require( !((address(_raisedNftArray[i].nftaddress) == new_nft) && (_raisedNftArray[i].tokenid == tokenid)), "ALC: Cant add duplicate NFT");
         }
@@ -297,13 +289,12 @@ contract Alchemy is IERC20 {
     /**
     * @notice returns the nft to the dao owner if allowed by the dao
     */
-    function returnNft() external {
-        require(msg.sender == _timelock, "ALC:Only TL");
-
+    function returnNft() onlyTimeLock external {
         _raisedNftArray[1].nftaddress.transferFrom(address(this), _owner, _raisedNftArray[1].tokenid);
         _nftCount--;
         delete _raisedNftArray[1];
     }
+
 
     /**
     * @notice executes any transaction
@@ -313,9 +304,7 @@ contract Alchemy is IERC20 {
     * @param signature the signature of the function call
     * @param data the calldata
     */
-    function executeTransaction(address target, uint256 value, string memory signature, bytes memory data) external payable returns (bytes memory) {
-        require(msg.sender == _timelock, "ALC:Only TL");
-
+    function executeTransaction(address target, uint256 value, string memory signature, bytes memory data) onlyTimeLock external payable returns (bytes memory) {
         bytes memory callData;
 
         if (bytes(signature).length == 0) {
@@ -329,6 +318,21 @@ contract Alchemy is IERC20 {
         require(success, "ALC:exec reverted");
 
         return returnData;
+    }
+
+    /**
+    * @notice modifier only timelock can call these functions
+    */
+    modifier onlyTimeLock() {
+        _isTimelock;
+        _;
+    }
+
+    /**
+    * @notice internal function for modifier to save gas and deploy code
+    */
+    function _isTimelock() internal view {
+        require(msg.sender == _timelock, "ALC:Only Timelock can call");
     }
 
     /**
