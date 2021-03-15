@@ -286,8 +286,8 @@ contract Alchemy is IERC20 {
         require(msg.sender == _timelock, "ALC:Only TL");
 
         for(uint256 i=1; i<= _nftCount; i++){
-            address tempAddr   = address(_raisedNftArray[_nftCount].nftaddress);
-            uint256 tempTokenId = _raisedNftArray[_nftCount].tokenid;
+            address tempAddr   = address(_raisedNftArray[i].nftaddress);
+            uint256 tempTokenId = _raisedNftArray[i].tokenid;
 
             require( !((tempAddr == new_nft) && (tempTokenId == tokenid)), "ALC: Cant add duplicate NFT");
         }
