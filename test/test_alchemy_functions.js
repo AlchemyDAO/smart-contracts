@@ -132,6 +132,8 @@ describe("Test Alchemy Functions", function () {
         const goveroraddress = await alchemy._governor();
         const govcontract = await ethers.getContractAt("GovernorAlpha", goveroraddress);
 
+
+
         let parameters = encoder.encode(
             ["uint256"],
             ["1000000000000000000"]
@@ -330,6 +332,12 @@ describe("Test Alchemy Functions", function () {
     it("Should be possible to burnForETH", async function () {
 
         await alchemy.burnForETH()
+
+    });
+
+    it("Should not be possible to call a function for TL directly", async function () {
+
+        await expect(alchemy.mintSharesForSale(2)).to.be.reverted;
 
     });
 

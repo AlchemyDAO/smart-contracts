@@ -7,7 +7,6 @@ import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {SafeMath} from "@openzeppelin/contracts/math/SafeMath.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
-
 /// @author Alchemy Team
 /// @title Alchemy
 /// @notice The Alchemy contract wraps nfts into erc20
@@ -116,6 +115,14 @@ contract Alchemy is IERC20 {
         _buyoutPrice = buyoutPrice_;
         _balances[_owner] = _totalSupply;
         emit Transfer(address(0), owner_, _totalSupply);
+    }
+
+    /**
+    * @notice modifier only timelock can call these functions
+    */
+    modifier onlyTimeLock() {
+        require(msg.sender == _timelock, "ALC:Only Timelock can call");
+        _;
     }
 
     /**
@@ -318,21 +325,6 @@ contract Alchemy is IERC20 {
         require(success, "ALC:exec reverted");
 
         return returnData;
-    }
-
-    /**
-    * @notice modifier only timelock can call these functions
-    */
-    modifier onlyTimeLock() {
-        _isTimelock;
-        _;
-    }
-
-    /**
-    * @notice internal function for modifier to save gas and deploy code
-    */
-    function _isTimelock() internal view {
-        require(msg.sender == _timelock, "ALC:Only Timelock can call");
     }
 
     /**
