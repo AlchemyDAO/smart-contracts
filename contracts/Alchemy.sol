@@ -188,12 +188,13 @@ contract Alchemy is IERC20 {
     * also a fee will be distributed 0.5%
     */
     function buyout() external payable {
-        require(msg.value >= _buyoutPrice, "buy value");
-
         uint256 balance = _balances[msg.sender];
         _balances[msg.sender] = 0;
 
-        uint256 changeMoney = msg.value.sub(_buyoutPrice.mul((_totalSupply.sub(balance)).div(_totalSupply)));
+        uint256 buyoutPriceWithDiscount = _buyoutPrice.mul((_totalSupply.sub(balance)).div(_totalSupply));
+        require(msg.value >= buyoutPriceWithDiscount, "buy value not met");
+
+        uint256 changeMoney = msg.value.sub(buyoutPriceWithDiscount);
         _burn(balance);
 
         for (uint i=1; i<=_nftCount; i++) {
@@ -202,7 +203,7 @@ contract Alchemy is IERC20 {
 
         // Take 0.5% fee
         address payable factoryowner = IAlchemyFactory(_factoryContract).getFactoryOwner();
-        IAlchemyRouter(factoryowner).deposit{value:_buyoutPrice / 200}();
+        IAlchemyRouter(factoryowner).deposit{value:buyoutPriceWithDiscount / 200}();
 
         msg.sender.transfer(changeMoney);
         emit Transfer(msg.sender, address(0), balance);
@@ -283,7 +284,7 @@ contract Alchemy is IERC20 {
     * @param new_nft the address of the new nft
     * @param tokenid the if of the nft token
     */
-    function addNft(address new_nft, uint256 tokenid) onlyTimeLock external{
+    function addNft(address new_nft, uint256 tokenid) onlyTimeLock external {
         for(uint256 i=1; i<= _nftCount; i++){
             require( !((address(_raisedNftArray[i].nftaddress) == new_nft) && (_raisedNftArray[i].tokenid == tokenid)), "ALC: Cant add duplicate NFT");
         }

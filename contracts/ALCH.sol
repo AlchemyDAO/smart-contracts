@@ -8,12 +8,12 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 /// @author Alchemy Team
 /// @title Alchemy
 /// @notice The Alchemy Governance Token
-contract ALC {
+contract ALCH {
     /// @notice EIP-20 token name for this token
     string public constant name = "Alchemy";
 
     /// @notice EIP-20 token symbol for this token
-    string public constant symbol = "ALC";
+    string public constant symbol = "ALCH";
 
     /// @notice EIP-20 token decimals for this token
     uint8 public constant decimals = 18;
@@ -102,7 +102,7 @@ contract ALC {
      * @param minter_ The address of the new minter
      */
     function setMinter(address minter_) external {
-        require(msg.sender == minter, "Alc::setMinter: only the minter can change the minter address");
+        require(msg.sender == minter, "Alch::setMinter: only the minter can change the minter address");
         emit MinterChanged(minter, minter_);
         minter = minter_;
     }
@@ -113,20 +113,20 @@ contract ALC {
      * @param rawAmount The number of tokens to be minted
      */
     function mint(address dst, uint rawAmount) external {
-        require(msg.sender == minter, "Alc::mint: only the minter can mint");
-        require(block.timestamp >= mintingAllowedAfter, "Alc::mint: minting not allowed yet");
-        require(dst != address(0), "Alc::mint: cannot transfer to the zero address");
+        require(msg.sender == minter, "Alch::mint: only the minter can mint");
+        require(block.timestamp >= mintingAllowedAfter, "Alch::mint: minting not allowed yet");
+        require(dst != address(0), "Alch::mint: cannot transfer to the zero address");
 
         // record the mint
         mintingAllowedAfter = SafeMath.add(block.timestamp, minimumTimeBetweenMints);
 
         // mint the amount
-        uint96 amount = safe96(rawAmount, "Alc::mint: amount exceeds 96 bits");
-        require(amount <= SafeMath.div(SafeMath.mul(totalSupply, mintCap), 100), "Alc::mint: exceeded mint cap");
-        totalSupply = safe96(SafeMath.add(totalSupply, amount), "Alc::mint: totalSupply exceeds 96 bits");
+        uint96 amount = safe96(rawAmount, "Alch::mint: amount exceeds 96 bits");
+        require(amount <= SafeMath.div(SafeMath.mul(totalSupply, mintCap), 100), "Alch::mint: exceeded mint cap");
+        totalSupply = safe96(SafeMath.add(totalSupply, amount), "Alch::mint: totalSupply exceeds 96 bits");
 
         // transfer the amount to the recipient
-        balances[dst] = add96(balances[dst], amount, "Alc::mint: transfer amount overflows");
+        balances[dst] = add96(balances[dst], amount, "Alch::mint: transfer amount overflows");
         emit Transfer(address(0), dst, amount);
 
         // move delegates
@@ -146,7 +146,7 @@ contract ALC {
         if (rawAmount == uint256(-1)) {
             amount = uint96(-1);
         } else {
-            amount = safe96(rawAmount, "Alc::approve: amount exceeds 96 bits");
+            amount = safe96(rawAmount, "Alch::approve: amount exceeds 96 bits");
         }
 
         allowances[msg.sender][spender] = amount;
@@ -168,7 +168,7 @@ contract ALC {
         if (rawAmount == uint256(-1)) {
             amount = uint96(-1);
         } else {
-            amount = safe96(rawAmount, "Alc::permit: amount exceeds 96 bits");
+            amount = safe96(rawAmount, "Alch::permit: amount exceeds 96 bits");
         }
 
         bytes32 domainSeparator = keccak256(
@@ -193,9 +193,9 @@ contract ALC {
             abi.encodePacked("\x19\x01", domainSeparator, structHash)
         );
         address signatory = ecrecover(digest, v, r, s);
-        require(signatory != address(0), "Alc::permit: invalid signature");
-        require(signatory == owner, "Alc::permit: unauthorized");
-        require(block.timestamp <= deadline, "Alc::permit: signature expired");
+        require(signatory != address(0), "Alch::permit: invalid signature");
+        require(signatory == owner, "Alch::permit: unauthorized");
+        require(block.timestamp <= deadline, "Alch::permit: signature expired");
 
         allowances[owner][spender] = amount;
 
@@ -211,7 +211,7 @@ contract ALC {
     }
 
     function transfer(address dst, uint256 rawAmount) external returns (bool) {
-        uint96 amount = safe96(rawAmount, "Alc::transfer: amount exceeds 96 bits");
+        uint96 amount = safe96(rawAmount, "Alch::transfer: amount exceeds 96 bits");
         _transferTokens(msg.sender, dst, amount);
         return true;
     }
@@ -223,13 +223,13 @@ contract ALC {
     ) external returns (bool) {
         address spender = msg.sender;
         uint96 spenderAllowance = allowances[src][spender];
-        uint96 amount = safe96(rawAmount, "Alc::approve: amount exceeds 96 bits");
+        uint96 amount = safe96(rawAmount, "Alch::approve: amount exceeds 96 bits");
 
         if (spender != src && spenderAllowance != uint96(-1)) {
             uint96 newAllowance = sub96(
                 spenderAllowance,
                 amount,
-                "Alc::transferFrom: transfer amount exceeds spender allowance"
+                "Alch::transferFrom: transfer amount exceeds spender allowance"
             );
             allowances[src][spender] = newAllowance;
 
@@ -267,9 +267,9 @@ contract ALC {
             abi.encodePacked("\x19\x01", domainSeparator, structHash)
         );
         address signatory = ecrecover(digest, v, r, s);
-        require(signatory != address(0), "Alc::delegateBySig: invalid signature");
-        require(nonce == nonces[signatory]++, "Alc::delegateBySig: invalid nonce");
-        require(block.timestamp <= expiry, "Alc::delegateBySig: signature expired");
+        require(signatory != address(0), "Alch::delegateBySig: invalid signature");
+        require(nonce == nonces[signatory]++, "Alch::delegateBySig: invalid nonce");
+        require(block.timestamp <= expiry, "Alch::delegateBySig: signature expired");
         return _delegate(signatory, delegatee);
     }
 
@@ -285,7 +285,7 @@ contract ALC {
     {
         require(
             blockNumber < block.number,
-            "Alc::getPriorVotes: not yet determined"
+            "Alch::getPriorVotes: not yet determined"
         );
 
         uint32 nCheckpoints = numCheckpoints[account];
@@ -334,22 +334,22 @@ contract ALC {
     ) internal {
         require(
             src != address(0),
-            "Alc::_transferTokens: cannot transfer from the zero address"
+            "Alch::_transferTokens: cannot transfer from the zero address"
         );
         require(
             dst != address(0),
-            "Alc::_transferTokens: cannot transfer to the zero address"
+            "Alch::_transferTokens: cannot transfer to the zero address"
         );
 
         balances[src] = sub96(
             balances[src],
             amount,
-            "Alc::_transferTokens: transfer amount exceeds balance"
+            "Alch::_transferTokens: transfer amount exceeds balance"
         );
         balances[dst] = add96(
             balances[dst],
             amount,
-            "Alc::_transferTokens: transfer amount overflows"
+            "Alch::_transferTokens: transfer amount overflows"
         );
         emit Transfer(src, dst, amount);
 
@@ -370,7 +370,7 @@ contract ALC {
                 uint96 srcRepNew = sub96(
                     srcRepOld,
                     amount,
-                    "Alc::_moveVotes: vote amount underflows"
+                    "Alch::_moveVotes: vote amount underflows"
                 );
                 _writeCheckpoint(srcRep, srcRepNum, srcRepOld, srcRepNew);
             }
@@ -383,7 +383,7 @@ contract ALC {
                 uint96 dstRepNew = add96(
                     dstRepOld,
                     amount,
-                    "Alc::_moveVotes: vote amount overflows"
+                    "Alch::_moveVotes: vote amount overflows"
                 );
                 _writeCheckpoint(dstRep, dstRepNum, dstRepOld, dstRepNew);
             }
@@ -398,7 +398,7 @@ contract ALC {
     ) internal {
         uint32 blockNumber = safe32(
             block.number,
-            "Alc::_writeCheckpoint: block number exceeds 32 bits"
+            "Alch::_writeCheckpoint: block number exceeds 32 bits"
         );
 
         if (

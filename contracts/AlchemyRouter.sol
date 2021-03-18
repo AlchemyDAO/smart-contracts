@@ -96,4 +96,9 @@ contract AlchemyRouter {
         require(msg.sender == owner, "Only owner");
         IAlchemyFactory(alchemyFactory).newFactoryOwner(newFactoryOwner);
     }
+
+    function setNewOwner(address newOwner) public {
+        require(msg.sender == owner, "Only owner");
+        owner = newOwner;
+    }
 }

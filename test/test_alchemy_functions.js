@@ -29,7 +29,7 @@ describe("Test Alchemy Functions", function () {
         [owner, addr1, addr2, addr3, addr4] = await ethers.getSigners();
 
         // deploy alc token
-        const ALC = await ethers.getContractFactory("ALC");
+        const ALC = await ethers.getContractFactory("ALCH");
         alc = await ALC.deploy(owner.address, owner.address, Date.now());
         await alc.deployed();
 
