@@ -318,6 +318,99 @@ describe("Test Alchemy Functions", function () {
         expect (shares).to.be.equal(1)
     });
 
+    it("Should be possible to buy shares for sale", async function () {
+
+        let overrides = {
+            value: "5000000000000000000"
+        };
+
+        let shares = await alchemy._sharesForSale()
+        expect (shares).to.be.equal("1000000000000000000")
+
+        await alchemy.Buyshares("500000000000000000", overrides)
+
+        shares = await alchemy._sharesForSale()
+        expect (shares).to.be.equal("500000000000000000")
+    });
+
+    it("Should be possible to make a proposal to burn shares for sale", async function () {
+
+        const goveroraddress = await alchemy._governor();
+        const govcontract = await ethers.getContractAt("GovernorAlpha", goveroraddress);
+
+
+        let parameters = encoder.encode(
+            ["uint256"],
+            ["200000000000000000"]
+        )
+
+        await govcontract.propose(
+            [alchemy.address],
+            [0],
+            ["burnSharesForSale(uint256)"],
+            [parameters],
+            "Test proposal to burn shares for sale"
+        );
+
+
+        await ethers.provider.send("evm_mine")      // mine the next block
+
+
+        await govcontract.castVote(5, true);
+
+        await ethers.provider.send("evm_increaseTime", [60*60*5])
+        await ethers.provider.send("evm_mine")      // mine the next block
+        await ethers.provider.send("evm_mine")      // mine the next block
+        await ethers.provider.send("evm_mine")      // mine the next block
+        await ethers.provider.send("evm_mine")      // mine the next block
+        await ethers.provider.send("evm_mine")      // mine the next block
+        await govcontract.queue(5)
+
+        await ethers.provider.send("evm_mine")      // mine the next block
+
+        await govcontract.execute(5)
+
+        let shares = await alchemy._sharesForSale()
+        expect (shares).to.be.equal("300000000000000000")
+
+    });
+
+    it("Should be possible to make a proposal to return the nft", async function () {
+
+        const goveroraddress = await alchemy._governor();
+        const govcontract = await ethers.getContractAt("GovernorAlpha", goveroraddress);
+
+
+        let parameters = encoder.encode(
+            [],
+            []
+        )
+
+        await govcontract.propose(
+            [alchemy.address],
+            [0],
+            ["returnNft()"],
+            [parameters],
+            "Test proposal to return the nft"
+        );
+
+
+        await ethers.provider.send("evm_mine")      // mine the next block
+        await govcontract.castVote(6, true);
+
+        await ethers.provider.send("evm_increaseTime", [60*60*5])
+        await ethers.provider.send("evm_mine")      // mine the next block
+        await ethers.provider.send("evm_mine")      // mine the next block
+        await ethers.provider.send("evm_mine")      // mine the next block
+        await ethers.provider.send("evm_mine")      // mine the next block
+        await ethers.provider.send("evm_mine")      // mine the next block
+        await govcontract.queue(6)
+
+        await ethers.provider.send("evm_mine")      // mine the next block
+
+        await govcontract.execute(6)
+    });
+
     it("Should be possible to buyout", async function () {
         let overrides = {
             value: "5000000000000000000"
@@ -336,10 +429,21 @@ describe("Test Alchemy Functions", function () {
     });
 
     it("Should not be possible to call a function for TL directly", async function () {
-
         await expect(alchemy.mintSharesForSale(2)).to.be.reverted;
-
     });
+
+    it("Should be possible to do a dao mint", async function () {
+        await alchemyFactory.NFTDAOMint(
+            minty.address,
+            owner.address,
+            0,
+            100,
+            "TEST",
+            "TOKEN",
+            "1000000000000000"
+        )
+    });
+
 
 
 });
