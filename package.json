@@ -21,6 +21,7 @@
     "@chainlink/contracts": "^0.0.12",
     "@nomiclabs/hardhat-etherscan": "^2.1.1",
     "@openzeppelin/contracts": "^3.4.0",
+    "openzeppelin-solidity-2.3.0": "npm:openzeppelin-solidity@2.3.0",
     "dotenv": "^8.2.0",
     "hardhat-contract-sizer": "^2.0.2",
     "openzeppelin-solidity": "^2.3.0"
