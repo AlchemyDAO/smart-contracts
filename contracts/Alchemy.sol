@@ -6,7 +6,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {SafeMath} from "@openzeppelin/contracts/math/SafeMath.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
-import "./Proxy.sol";
 
 
 /// @author Alchemy Team
@@ -92,13 +91,12 @@ contract Alchemy is IERC20 {
     // An event thats emitted when a delegate account's vote balance changes
     event DelegateVotesChanged(address indexed delegate, uint previousBalance, uint newBalance);
 
-
-    constructor(bool disable) public {
-      // make sure the implementation can not be initialized
-      if (disable) _factoryContract = address(1);
+    constructor() public {
+        // Don't allow implementation to be initialized.
+        _factoryContract = address(1);
     }
 
-    function initializeProxy(
+    function initialize(
         IERC721 nftAddress_,
         address owner_,
         uint256 tokenId_,
@@ -106,13 +104,17 @@ contract Alchemy is IERC20 {
         string memory name_,
         string memory symbol_,
         uint256 buyoutPrice_,
-        address factoryContract
+        address factoryContract,
+        address governor_,
+        address timelock_
     ) external {
         require(_factoryContract == address(0), "already initialized");
         require(factoryContract != address(0), "factory can not be null");
 
         _owner = owner_;
         _factoryContract = factoryContract;
+        _governor = governor_;
+        _timelock = timelock_;
 
         _nftCount++;
         _raisedNftArray[_nftCount].nftaddress = nftAddress_;
@@ -132,25 +134,6 @@ contract Alchemy is IERC20 {
     modifier onlyTimeLock() {
         require(msg.sender == _timelock, "ALC:Only Timelock can call");
         _;
-    }
-
-    /**
-    * @dev Init function to set up the contract
-    *
-    * @param governorFactory the governor alpha factory contract
-    * @param votinginit the voting period in blocks
-    * @param timelockFactory the timelock factory contract
-    * @param timelockinit the timelock delay in seconds
-    */
-    function init(address governorFactory, uint votinginit, address timelockFactory, uint256 timelockinit) external {
-        require(msg.sender == _owner, "only owner");
-        require(_governor == address(0));
-
-        _governor = GovernorFactoryInterface(governorFactory).GovernorMint(address(this), _totalSupply, votinginit);
-        _timelock = TimelockFactoryInterface(timelockFactory).TimelockMint(_governor, timelockinit);
-        GovernorInstance(_governor).init(_timelock);
-
-        _raisedNftArray[_nftCount].nftaddress.transferFrom(_owner, address(this), _raisedNftArray[_nftCount].tokenid);
     }
 
     /**
@@ -620,128 +603,14 @@ contract Alchemy is IERC20 {
         assembly { chainId := chainid() }
         return chainId;
     }
-
 }
 
-interface TimelockFactoryInterface {
-    function TimelockMint(address admin_,uint delay_) external returns (address);
-}
-
-interface GovernorFactoryInterface {
-    function GovernorMint(address nft_, uint supply_, uint votingtime) external returns (address);
-
-}
-
-interface GovernorInstance {
-    function init(address timelock) external;
-}
-
-interface IAlc {
-    function transfer(address dst, uint256 rawAmount)  external;
-    function balanceOf(address account) external view returns (uint256);
-}
 
 interface IAlchemyFactory {
     function getFactoryOwner() external view returns (address payable);
 }
 
+
 interface IAlchemyRouter {
     function deposit() external payable;
-}
-
-/// @author Alchemy Team
-/// @title AlchemyFactory
-/// @notice Factory contract to create new instances of Alchemy
-contract AlchemyFactory {
-
-    // event thats emitted when a new Alchemy Contract was minted
-    event NewAlchemy(address deployed);
-
-    // the Alchemy governance token
-    IAlc public alc;
-
-    // the factory owner
-    address payable public factoryOwner;
-    address public immutable alchemyImplementation;
-
-    // set ALC token
-    constructor(IAlc _alc, address _alchemyImplementation) {
-        alc = _alc;
-        factoryOwner = msg.sender;
-        alchemyImplementation = _alchemyImplementation;
-    }
-
-    /**
-     * @dev distributes the ALC token supply
-     *
-     * @param amount the amount to distribute
-    */
-    function distributeAlc(uint amount) internal {
-        if (alc.balanceOf(address(this)) >= amount) {
-            alc.transfer(msg.sender, amount);
-        }
-    }
-
-    /**
-     * @dev mints a new Alchemy Contract
-     *
-     * @param nftAddress_ the initial nft address to add to the contract
-     * @param owner_ the owner of the contract
-     * @param tokenId_ the token id of the nft to be added
-     * @param totalSupply_ the total supply of the erc20
-     * @param name_ the token name
-     * @param symbol_ the token symbol
-     * @param buyoutPrice_ the buyout price to buyout the dao
-     * @return the address of the newly generated alchemy contract
-    */
-    function NFTDAOMint(
-        IERC721 nftAddress_,
-        address owner_,
-        uint256 tokenId_,
-        uint256 totalSupply_,
-        string memory name_,
-        string memory symbol_,
-        uint256 buyoutPrice_
-    ) public returns (address) {
-        Alchemy newContract = Alchemy(address(new Proxy(
-            alchemyImplementation
-        )));
-
-        newContract.initializeProxy(
-            nftAddress_,
-            owner_,
-            tokenId_,
-            totalSupply_,
-            name_,
-            symbol_,
-            buyoutPrice_,
-            address(this)
-        );
-
-
-        // distribute gov token
-        distributeAlc(100 * 10 ** 18);
-
-        emit NewAlchemy(address(newContract));
-        return address(newContract);
-    }
-
-    /**
-     * @dev lets the owner change the ownership to another address
-     *
-     * @param newOwner the address of the new owner
-    */
-    function newFactoryOwner(address payable newOwner) external {
-        require(msg.sender == factoryOwner, "Only owner");
-        factoryOwner = newOwner;
-    }
-
-    /**
-     * @dev gets the address of the current factory owner
-     *
-     * @return the address of the factory owner
-    */
-    function getFactoryOwner() public view returns (address payable) {
-        return factoryOwner;
-    }
 }

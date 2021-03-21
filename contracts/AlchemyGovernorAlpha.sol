@@ -2,8 +2,6 @@
 pragma solidity ^0.6.5;
 pragma experimental ABIEncoderV2;
 
-import "./Proxy.sol";
-
 
 /// @author Alchemy Team
 /// @title GovernorAlpha
@@ -15,8 +13,8 @@ contract GovernorAlpha {
     // supply of the governor token
     uint public totalSupply;
 
-    // the voting period
-    uint public votingtime;
+    // The duration of voting on a proposal, in blocks
+    uint public votingPeriod;
 
     // The number of votes in support of a proposal required in order for a quorum to be reached and for a vote to succeed
     function quorumVotes() public view returns (uint) { return (totalSupply) / 100 * 4; } // 4% of NFT DAO
@@ -29,9 +27,6 @@ contract GovernorAlpha {
 
     // The delay before voting on a proposal may take place, once proposed
     function votingDelay() public pure returns (uint) { return 1; } // 1 block
-
-    // The duration of voting on a proposal, in blocks
-    function votingPeriod() public view returns (uint) { return votingtime; } // ~7 days in blocks (assuming 15s blocks)
 
     // The address of the NFT Protocol Timelock
     TimelockInterface public timelock;
@@ -137,16 +132,22 @@ contract GovernorAlpha {
     // An event emitted when a proposal has been executed in the Timelock
     event ProposalExecuted(uint id);
 
-    function initializeProxy(address nft_, uint supply_, uint votingtime_) external {
-      require(address(nft) == address(0), "Already initialized");
-      require(nft_ != address(0), "Invalid NFT address");
-        nft = NftInterface(nft_);
-        totalSupply = supply_;
-        votingtime = votingtime_;
+    constructor() public {
+        // Don't allow implementation to be initialized.
+        nft = NftInterface(address(1));
     }
 
-    function init(address timelock_) external {
-        require (msg.sender == address(nft), "Can only be inited from NFT DAO Main Contract");
+    function initialize(
+      address nft_,
+      address timelock_,
+      uint supply_,
+      uint votingPeriod_
+    ) external {
+        require(address(nft) == address(0), "Already initialized");
+        require(nft_ != address(0), "Invalid NFT address");
+        nft = NftInterface(nft_);
+        totalSupply = supply_;
+        votingPeriod = votingPeriod_;
         timelock = TimelockInterface(timelock_);
     }
 
@@ -164,7 +165,7 @@ contract GovernorAlpha {
         }
 
         uint startBlock = add256(block.number, votingDelay());
-        uint endBlock = add256(startBlock, votingPeriod());
+        uint endBlock = add256(startBlock, votingPeriod);
 
         proposalCount++;
         Proposal memory newProposal = Proposal({
@@ -325,36 +326,4 @@ interface TimelockInterface {
 
 interface NftInterface {
     function getPriorVotes(address account, uint blockNumber) external view returns (uint256);
-}
-
-/// @author Alchemy Team
-/// @title GovernorAlphaFactory
-/// @notice The GovernorAlpha Contract factory for Alchemys
-contract GovernorAlphaFactory {
-    address public immutable governorAlphaImplementation;
-
-    constructor(address _governorAlphaImplementation) public {
-        governorAlphaImplementation = _governorAlphaImplementation;
-    }
-
-    /// @notice event for new governor
-    event NewGovernor(address deployed);
-
-    /// @notice mint governance
-    /// @param nft_ nft address
-    /// @return the new timelock address
-    function GovernorMint(
-        address nft_,
-        uint supply_,
-        uint votingtime_
-    ) public returns (address) {
-        GovernorAlpha newContract = GovernorAlpha(address(new Proxy(governorAlphaImplementation)));
-        newContract.initializeProxy(
-            nft_,
-            supply_,
-            votingtime_
-        );
-        emit NewGovernor(address(newContract));
-        return address(newContract);
-    }
 }
