@@ -13,6 +13,8 @@ const encoder = defaultAbiCoder
 describe("Test Alchemy Functions", function () {
 
     // variable to store the deployed smart contract
+    let governorAlphaImplementation;
+    let alchemyImplementation;
     let alchemyFactory;
     let governorFactory;
     let timelockFactory;
@@ -28,14 +30,22 @@ describe("Test Alchemy Functions", function () {
     before(async function () {
         [owner, addr1, addr2, addr3, addr4] = await ethers.getSigners();
 
+        const GOVERNOR_ALPHA = await ethers.getContractFactory("GovernorAlpha");
+        governorAlphaImplementation = await GOVERNOR_ALPHA.deploy();
+        await governorAlphaImplementation.deployed();
+
         // deploy alc token
         const ALC = await ethers.getContractFactory("ALCH");
         alc = await ALC.deploy(owner.address, owner.address, Date.now());
         await alc.deployed();
 
+        const ALCHEMY_IMPLEMENTATION = await ethers.getContractFactory("Alchemy");
+        alchemyImplementation = await ALCHEMY_IMPLEMENTATION.deploy(true);
+        await alchemyImplementation.deployed();
+
         // deploy alchemy factory
         const ALCHEMY = await ethers.getContractFactory("AlchemyFactory");
-        alchemyFactory = await ALCHEMY.deploy(alc.address);
+        alchemyFactory = await ALCHEMY.deploy(alc.address, alchemyImplementation.address);
         await alchemyFactory.deployed();
 
         // deploy timelock
@@ -45,7 +55,7 @@ describe("Test Alchemy Functions", function () {
 
         // deploy governor
         const GOVERNOR = await ethers.getContractFactory("GovernorAlphaFactory");
-        governorFactory = await GOVERNOR.deploy();
+        governorFactory = await GOVERNOR.deploy(governorAlphaImplementation.address);
         await governorFactory.deployed();
 
         // deploy staking rewards
@@ -70,16 +80,17 @@ describe("Test Alchemy Functions", function () {
 
         // deploy minty
         const ALCHEMYCON = await ethers.getContractFactory("Alchemy");
-        alchemy = await ALCHEMYCON.deploy(
-            minty.address,
-            owner.address,
-            0,
-            1000000,
-            "TEST",
-            "CASE",
-            "1000000000000000000",
-            alchemyFactory.address
-        );
+        alchemy = await ALCHEMYCON.deploy(false);
+        await alchemy.initializeProxy(
+          minty.address,
+          owner.address,
+          0,
+          1000000,
+          "TEST",
+          "CASE",
+          "1000000000000000000",
+          alchemyFactory.address
+        )
         await alchemy.deployed();
     })
 
