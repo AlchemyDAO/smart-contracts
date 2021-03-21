@@ -204,17 +204,26 @@ contract Timelock {
     uint public constant MINIMUM_DELAY = 0 days;
     uint public constant MAXIMUM_DELAY = 30 days;
 
-    address public admin;
+    address public admin = address(0);
     address public pendingAdmin;
     uint public delay;
 
     mapping (bytes32 => bool) public queuedTransactions;
 
+    constructor() public {
+        // Don't allow implementation to be initialized.
+        admin = address(1);
+    }
 
-    constructor(address admin_, uint delay_) {
-        require(delay_ >= MINIMUM_DELAY, "Timelock::constructor: Delay must exceed minimum delay.");
-        require(delay_ <= MAXIMUM_DELAY, "Timelock::setDelay: Delay must not exceed maximum delay.");
-
+    /**
+     * @dev Initialize the timelock proxy contract by setting the admin and delay fields.
+     * Reverts if the contract has already been initialized.
+     */
+    function initialize(address admin_, uint delay_) external {
+        require(admin == address(0), "Timelock::initialize: Already initialized.");
+        require(admin_ != address(0), "Timelock::initialize: Can not set null admin.");
+        require(delay_ >= MINIMUM_DELAY, "Timelock::initialize: Delay must exceed minimum delay.");
+        require(delay_ <= MAXIMUM_DELAY, "Timelock::initialize: Delay must not exceed maximum delay.");
         admin = admin_;
         delay = delay_;
     }
@@ -300,30 +309,5 @@ contract Timelock {
     function getBlockTimestamp() internal view returns (uint) {
         // solium-disable-next-line security/no-block-members
         return block.timestamp;
-    }
-}
-
-/// @author Alchemy Team
-/// @title TimelockFactory
-/// @notice The TimelockFactory Contract for Alchemys
-contract TimelockFactory {
-
-    /// @notice event for creation
-    event NewTimelock(address deployed);
-
-    /// @notice mint timelocks
-    /// @param admin_ the timelock admin
-    /// @param delay_ timelock delay
-    /// @return the new timelock address
-    function TimelockMint(
-        address admin_,
-        uint delay_
-    ) external returns (address) {
-        Timelock newContract = new Timelock(
-            admin_,
-            delay_
-        );
-        emit NewTimelock(address(newContract));
-        return address(newContract);
     }
 }
