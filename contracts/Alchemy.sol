@@ -6,6 +6,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {SafeMath} from "@openzeppelin/contracts/math/SafeMath.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+import "./Proxy.sol";
+
 
 /// @author Alchemy Team
 /// @title Alchemy
@@ -26,7 +28,7 @@ contract Alchemy is IERC20 {
     string internal _symbol;
 
     // representing the decimals of the governance token
-    uint8 internal immutable _decimals = 18;
+    uint8 internal constant _decimals = 18;
 
     // a record of balance of a specific account by address
     mapping(address => uint256) private _balances;
@@ -91,7 +93,12 @@ contract Alchemy is IERC20 {
     event DelegateVotesChanged(address indexed delegate, uint previousBalance, uint newBalance);
 
 
-    constructor (
+    constructor(bool disable) public {
+      // make sure the implementation can not be initialized
+      if (disable) _factoryContract = address(1);
+    }
+
+    function initializeProxy(
         IERC721 nftAddress_,
         address owner_,
         uint256 tokenId_,
@@ -100,8 +107,10 @@ contract Alchemy is IERC20 {
         string memory symbol_,
         uint256 buyoutPrice_,
         address factoryContract
-    )
-    {
+    ) external {
+        require(_factoryContract == address(0), "already initialized");
+        require(factoryContract != address(0), "factory can not be null");
+
         _owner = owner_;
         _factoryContract = factoryContract;
 
@@ -653,11 +662,13 @@ contract AlchemyFactory {
 
     // the factory owner
     address payable public factoryOwner;
+    address public immutable alchemyImplementation;
 
     // set ALC token
-    constructor(IAlc _alc) {
+    constructor(IAlc _alc, address _alchemyImplementation) {
         alc = _alc;
         factoryOwner = msg.sender;
+        alchemyImplementation = _alchemyImplementation;
     }
 
     /**
@@ -692,7 +703,11 @@ contract AlchemyFactory {
         string memory symbol_,
         uint256 buyoutPrice_
     ) public returns (address) {
-        Alchemy newContract = new Alchemy(
+        Alchemy newContract = Alchemy(address(new Proxy(
+            alchemyImplementation
+        )));
+
+        newContract.initializeProxy(
             nftAddress_,
             owner_,
             tokenId_,
@@ -702,6 +717,7 @@ contract AlchemyFactory {
             buyoutPrice_,
             address(this)
         );
+
 
         // distribute gov token
         distributeAlc(100 * 10 ** 18);

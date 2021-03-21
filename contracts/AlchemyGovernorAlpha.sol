@@ -2,6 +2,8 @@
 pragma solidity ^0.6.5;
 pragma experimental ABIEncoderV2;
 
+import "./Proxy.sol";
+
 
 /// @author Alchemy Team
 /// @title GovernorAlpha
@@ -135,7 +137,9 @@ contract GovernorAlpha {
     // An event emitted when a proposal has been executed in the Timelock
     event ProposalExecuted(uint id);
 
-    constructor(address nft_, uint supply_, uint votingtime_) public {
+    function initializeProxy(address nft_, uint supply_, uint votingtime_) external {
+      require(address(nft) == address(0), "Already initialized");
+      require(nft_ != address(0), "Invalid NFT address");
         nft = NftInterface(nft_);
         totalSupply = supply_;
         votingtime = votingtime_;
@@ -327,6 +331,11 @@ interface NftInterface {
 /// @title GovernorAlphaFactory
 /// @notice The GovernorAlpha Contract factory for Alchemys
 contract GovernorAlphaFactory {
+    address public immutable governorAlphaImplementation;
+
+    constructor(address _governorAlphaImplementation) public {
+        governorAlphaImplementation = _governorAlphaImplementation;
+    }
 
     /// @notice event for new governor
     event NewGovernor(address deployed);
@@ -339,7 +348,8 @@ contract GovernorAlphaFactory {
         uint supply_,
         uint votingtime_
     ) public returns (address) {
-        GovernorAlpha newContract = new GovernorAlpha(
+        GovernorAlpha newContract = GovernorAlpha(address(new Proxy(governorAlphaImplementation)));
+        newContract.initializeProxy(
             nft_,
             supply_,
             votingtime_
