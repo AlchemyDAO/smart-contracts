@@ -18,6 +18,7 @@ contract AlchemyRouter {
     address payable public treasury;
     address public owner;
     address public alchemyFactory;
+    uint256 public threshold = 100000000000000000;
 
     constructor(IStakingRewards _stakingRewards, address payable _treasury, address _alchemyFactory) {
         stakingRewards = _stakingRewards;
@@ -48,7 +49,7 @@ contract AlchemyRouter {
     function deposit() external payable {
         uint256 balance = address(this).balance;
 
-        if (balance > 100000000000000000) {
+        if (balance > threshold) {
             distribute();
         }
     }
@@ -60,7 +61,7 @@ contract AlchemyRouter {
     fallback() external payable {
         uint256 balance = address(this).balance;
 
-        if (balance > 100000000000000000) {
+        if (balance > threshold) {
             distribute();
         }
     }
@@ -72,7 +73,7 @@ contract AlchemyRouter {
     receive() external payable {
         uint256 balance = address(this).balance;
 
-        if (balance > 100000000000000000) {
+        if (balance > threshold) {
             distribute();
         }
     }
@@ -100,5 +101,10 @@ contract AlchemyRouter {
     function setNewOwner(address newOwner) public {
         require(msg.sender == owner, "Only owner");
         owner = newOwner;
+    }
+
+    function setNewThreshold(uint256 newthreshold) public {
+        require(msg.sender == owner, "Only owner");
+        threshold = newthreshold;
     }
 }
