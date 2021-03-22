@@ -50,7 +50,7 @@ contract Alchemy is IERC20 {
     uint256 public _nftCount;
 
     // array for raised nfts
-    mapping (uint256 => _raisedNftStruct) public _raisedNftArray;
+    _raisedNftStruct[] public _raisedNftArray;
 
     // mapping to store the already owned nfts
     mapping (address => mapping( uint256 => bool)) public _ownedAlready;
@@ -94,7 +94,7 @@ contract Alchemy is IERC20 {
     // An event thats emitted when a delegate account's vote balance changes
     event DelegateVotesChanged(address indexed delegate, uint previousBalance, uint newBalance);
 
-    constructor() public {
+    constructor() {
         // Don't allow implementation to be initialized.
         _factoryContract = address(1);
     }
@@ -119,9 +119,12 @@ contract Alchemy is IERC20 {
         _governor = governor_;
         _timelock = timelock_;
 
+        _raisedNftStruct memory temp_struct;
+        temp_struct.nftaddress = nftAddress_;
+        temp_struct.tokenid = tokenId_;
+        _raisedNftArray.push(temp_struct);
         _nftCount++;
-        _raisedNftArray[_nftCount].nftaddress = nftAddress_;
-        _raisedNftArray[_nftCount].tokenid = tokenId_;
+
         _ownedAlready[address(nftAddress_)][tokenId_] = true;
 
         _totalSupply = totalSupply_ * 10 ** 18;
@@ -137,14 +140,6 @@ contract Alchemy is IERC20 {
     */
     modifier onlyTimeLock() {
         require(msg.sender == _timelock, "ALC:Only Timelock can call");
-        _;
-    }
-
-    /**
-    * @notice modifier only this contract can call these functions
-    */
-    modifier onlyDAO() {
-        require(msg.sender == address(this), "ALC:Only DAO can call");
         _;
     }
 
@@ -201,7 +196,7 @@ contract Alchemy is IERC20 {
         uint256 changeMoney = msg.value.sub(buyoutPriceWithDiscount);
         _burn(balance);
 
-        for (uint i=1; i<=_nftCount; i++) {
+        for (uint i=0; i<_nftCount; i++) {
             _raisedNftArray[i].nftaddress.transferFrom(address(this), msg.sender, _raisedNftArray[i].tokenid);
         }
 
@@ -289,22 +284,25 @@ contract Alchemy is IERC20 {
     * @param new_nft the address of the new nft
     * @param tokenid the if of the nft token
     */
-    function addNft(address new_nft, uint256 tokenid) onlyDAO public {
+    function addNft(address new_nft, uint256 tokenid) onlyTimeLock public {
         require(_ownedAlready[new_nft][tokenid] == false, "ALC: Cant add duplicate NFT");
 
+        _raisedNftStruct memory temp_struct;
+        temp_struct.nftaddress = IERC721(new_nft);
+        temp_struct.tokenid = tokenid;
+        _raisedNftArray.push(temp_struct);
         _nftCount++;
-        _ownedAlready[address(_raisedNftArray[_nftCount].nftaddress)][_raisedNftArray[_nftCount].tokenid] = true;
-        _raisedNftArray[_nftCount].nftaddress = IERC721(new_nft);
-        _raisedNftArray[_nftCount].tokenid = tokenid;
+
+        _ownedAlready[new_nft][tokenid] = true;
     }
 
     /**
-    * @notice transfers an NFT to the DAO contract (called by executeTransaction function) 
+    * @notice transfers an NFT to the DAO contract (called by executeTransaction function)
     *
     * @param new_nft the address of the new nft
     * @param tokenid the if of the nft token
     */
-    function transferFromAndAdd(address new_nft, uint256 tokenid) onlyDAO public {
+    function transferFromAndAdd(address new_nft, uint256 tokenid) onlyTimeLock public {
         IERC721(new_nft).transferFrom(msg.sender, address(this), tokenid);
         addNft(new_nft, tokenid);
     }
@@ -313,10 +311,10 @@ contract Alchemy is IERC20 {
     * @notice returns the nft to the dao owner if allowed by the dao
     */
     function returnNft() onlyTimeLock external {
-        _raisedNftArray[1].nftaddress.transferFrom(address(this), _owner, _raisedNftArray[1].tokenid);
+        _raisedNftArray[0].nftaddress.transferFrom(address(this), _owner, _raisedNftArray[0].tokenid);
         _nftCount--;
-        _ownedAlready[address(_raisedNftArray[1].nftaddress)][_raisedNftArray[1].tokenid] = false;
-        delete _raisedNftArray[1];
+        _ownedAlready[address(_raisedNftArray[0].nftaddress)][_raisedNftArray[0].tokenid] = false;
+        delete _raisedNftArray[0];
     }
 
     /**

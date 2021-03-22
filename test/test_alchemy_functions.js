@@ -282,11 +282,11 @@ describe("Test Alchemy Functions", function () {
               value: "3000000000000000000"
           };
   
-          await expect(alchemy.buySingleNft(2, overrides)).to.be.reverted;
+          await expect(alchemy.buySingleNft(1, overrides)).to.be.reverted;
   
           let parameters = encoder.encode(
               ["uint256","uint256","bool"],
-              [2, "1000000000000000000", true]
+              [1, "1000000000000000000", true]
           )
   
           await govcontract.propose(
@@ -314,7 +314,7 @@ describe("Test Alchemy Functions", function () {
   
           await govcontract.execute(4)
   
-          await alchemy.buySingleNft(2, overrides);
+          await alchemy.buySingleNft(1, overrides);
   
           let shares = await alchemy._nftCount()
           expect (shares).to.be.equal(1)
