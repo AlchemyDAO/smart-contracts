@@ -52,6 +52,9 @@ contract Alchemy is IERC20 {
     // array for raised nfts
     mapping (uint256 => _raisedNftStruct) public _raisedNftArray;
 
+    // mapping to store the already owned nfts
+    mapping (address => mapping( uint256 => bool)) public _ownedAlready;
+
     // the owner and creator of the contract
     address public _owner;
 
@@ -119,6 +122,7 @@ contract Alchemy is IERC20 {
         _nftCount++;
         _raisedNftArray[_nftCount].nftaddress = nftAddress_;
         _raisedNftArray[_nftCount].tokenid = tokenId_;
+        _ownedAlready[address(nftAddress_)][tokenId_] = true;
 
         _totalSupply = totalSupply_ * 10 ** 18;
         _name = name_;
@@ -133,6 +137,14 @@ contract Alchemy is IERC20 {
     */
     modifier onlyTimeLock() {
         require(msg.sender == _timelock, "ALC:Only Timelock can call");
+        _;
+    }
+
+    /**
+    * @notice modifier only this contract can call these functions
+    */
+    modifier onlyDAO() {
+        require(msg.sender == address(this), "ALC:Only DAO can call");
         _;
     }
 
@@ -265,6 +277,7 @@ contract Alchemy is IERC20 {
         IAlchemyRouter(factoryowner).deposit{value:_raisedNftArray[nftarrayid].price / 200}();
 
         _nftCount--;
+        _ownedAlready[address(_raisedNftArray[nftarrayid].nftaddress)][_raisedNftArray[nftarrayid].tokenid] = false;
         delete _raisedNftArray[nftarrayid];
         msg.sender.transfer(changeMoney);
     }
@@ -276,14 +289,24 @@ contract Alchemy is IERC20 {
     * @param new_nft the address of the new nft
     * @param tokenid the if of the nft token
     */
-    function addNft(address new_nft, uint256 tokenid) onlyTimeLock external {
-        for(uint256 i=1; i<= _nftCount; i++){
-            require( !((address(_raisedNftArray[i].nftaddress) == new_nft) && (_raisedNftArray[i].tokenid == tokenid)), "ALC: Cant add duplicate NFT");
-        }
+    function addNft(address new_nft, uint256 tokenid) onlyDAO public {
+        require(_ownedAlready[new_nft][tokenid] == false, "ALC: Cant add duplicate NFT");
 
         _nftCount++;
+        _ownedAlready[address(_raisedNftArray[_nftCount].nftaddress)][_raisedNftArray[_nftCount].tokenid] = true;
         _raisedNftArray[_nftCount].nftaddress = IERC721(new_nft);
         _raisedNftArray[_nftCount].tokenid = tokenid;
+    }
+
+    /**
+    * @notice transfers an NFT to the DAO contract (called by executeTransaction function) 
+    *
+    * @param new_nft the address of the new nft
+    * @param tokenid the if of the nft token
+    */
+    function transferFromAndAdd(address new_nft, uint256 tokenid) onlyDAO public {
+        IERC721(new_nft).transferFrom(msg.sender, address(this), tokenid);
+        addNft(new_nft, tokenid);
     }
 
     /**
@@ -292,9 +315,9 @@ contract Alchemy is IERC20 {
     function returnNft() onlyTimeLock external {
         _raisedNftArray[1].nftaddress.transferFrom(address(this), _owner, _raisedNftArray[1].tokenid);
         _nftCount--;
+        _ownedAlready[address(_raisedNftArray[1].nftaddress)][_raisedNftArray[1].tokenid] = false;
         delete _raisedNftArray[1];
     }
-
 
     /**
     * @notice executes any transaction
