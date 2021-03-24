@@ -201,8 +201,8 @@ contract Alchemy is IERC20 {
         }
 
         // Take 0.5% fee
-        address payable factoryowner = IAlchemyFactory(_factoryContract).getFactoryOwner();
-        IAlchemyRouter(factoryowner).deposit{value:buyoutPriceWithDiscount / 200}();
+        address payable alchemyRouter = IAlchemyFactory(_factoryContract).getAlchemyRouter();
+        IAlchemyRouter(alchemyRouter).deposit{value:buyoutPriceWithDiscount / 200}();
 
         msg.sender.transfer(changeMoney);
         emit Transfer(msg.sender, address(0), balance);
@@ -268,8 +268,8 @@ contract Alchemy is IERC20 {
         _raisedNftArray[nftarrayid].nftaddress.transferFrom(address(this), msg.sender, _raisedNftArray[nftarrayid].tokenid);
 
         // Take 0.5% fee
-        address payable factoryowner = IAlchemyFactory(_factoryContract).getFactoryOwner();
-        IAlchemyRouter(factoryowner).deposit{value:_raisedNftArray[nftarrayid].price / 200}();
+        address payable alchemyRouter = IAlchemyFactory(_factoryContract).getAlchemyRouter();
+        IAlchemyRouter(alchemyRouter).deposit{value:_raisedNftArray[nftarrayid].price / 200}();
 
         _nftCount--;
         _ownedAlready[address(_raisedNftArray[nftarrayid].nftaddress)][_raisedNftArray[nftarrayid].tokenid] = false;
@@ -628,9 +628,8 @@ contract Alchemy is IERC20 {
 
 
 interface IAlchemyFactory {
-    function getFactoryOwner() external view returns (address payable);
+    function getAlchemyRouter() external view returns (address payable);
 }
-
 
 interface IAlchemyRouter {
     function deposit() external payable;

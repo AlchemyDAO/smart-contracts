@@ -3,7 +3,6 @@ pragma solidity ^0.7.6;
 pragma experimental ABIEncoderV2;
 
 import "./interfaces/IStakingRewards.sol";
-import "./interfaces/IAlchemyFactory.sol";
 
 
 /// @author Alchemy Team
@@ -17,13 +16,11 @@ contract AlchemyRouter {
     IStakingRewards public stakingRewards;
     address payable public treasury;
     address public owner;
-    address public alchemyFactory;
     uint256 public threshold = 100000000000000000;
 
-    constructor(IStakingRewards _stakingRewards, address payable _treasury, address _alchemyFactory) {
+    constructor(IStakingRewards _stakingRewards, address payable _treasury) {
         stakingRewards = _stakingRewards;
         treasury = _treasury;
-        alchemyFactory = _alchemyFactory;
         owner = msg.sender;
     }
 
@@ -86,16 +83,6 @@ contract AlchemyRouter {
     function newTreasury(address payable newTrewasury) public {
         require(msg.sender == owner, "Only owner");
         treasury = newTrewasury;
-    }
-
-    function newAlchemyFactory(address newAlchemyAddress) public {
-        require(msg.sender == owner, "Only owner");
-        alchemyFactory = newAlchemyAddress;
-    }
-
-    function newAlchemyFactoryOwner(address payable newFactoryOwner) public {
-        require(msg.sender == owner, "Only owner");
-        IAlchemyFactory(alchemyFactory).newFactoryOwner(newFactoryOwner);
     }
 
     function setNewOwner(address newOwner) public {

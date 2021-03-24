@@ -20,6 +20,7 @@ contract AlchemyFactory {
 
     // the factory owner
     address payable public factoryOwner;
+    address payable public alchemyRouter;
     address public immutable alchemyImplementation;
     address public immutable governorAlphaImplementation;
     address public immutable timelockImplementation;
@@ -29,13 +30,15 @@ contract AlchemyFactory {
         IERC20 _alch,
         address _alchemyImplementation,
         address _governorAlphaImplementation,
-        address _timelockImplementation
-    ) public {
+        address _timelockImplementation,
+        address payable _alchemyRouter
+    ) {
         alch = _alch;
         factoryOwner = msg.sender;
         alchemyImplementation = _alchemyImplementation;
         governorAlphaImplementation = _governorAlphaImplementation;
         timelockImplementation = _timelockImplementation;
+        alchemyRouter =_alchemyRouter;
     }
 
     /**
@@ -112,6 +115,17 @@ contract AlchemyFactory {
     }
 
     /**
+     * @dev lets the owner transfer alch token to another address
+     *
+     * @param dst the address to send the tokens
+     * @param amount the token amount
+    */
+    function transferAlch(address dst, uint256 amount) external {
+        require(msg.sender == factoryOwner, "Only owner");
+        alch.transfer(dst, amount);
+    }
+
+    /**
      * @dev lets the owner change the ownership to another address
      *
      * @param newOwner the address of the new owner
@@ -122,12 +136,22 @@ contract AlchemyFactory {
     }
 
     /**
-     * @dev gets the address of the current factory owner
+     * @dev lets the owner change the address to another address
      *
-     * @return the address of the factory owner
+     * @param newRouter the address of the new router
     */
-    function getFactoryOwner() public view returns (address payable) {
-        return factoryOwner;
+    function newAlchemyRouter(address payable newRouter) external {
+        require(msg.sender == factoryOwner, "Only owner");
+        alchemyRouter = newRouter;
+    }
+
+    /**
+     * @dev gets the address of the current alchemy router
+     *
+     * @return the address of the alchemy router
+    */
+    function getAlchemyRouter() public view returns (address payable) {
+        return alchemyRouter;
     }
 }
 
