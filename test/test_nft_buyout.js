@@ -10,7 +10,7 @@ const provider = waffle.provider;
 const encoder = defaultAbiCoder
 
 // test suite for Alchemy
-describe("Test Alchemy Functions", function () {
+describe("Test buyout", function () {
 
     // variable to store the deployed smart contract
     let governorAlphaImplementation;
@@ -176,15 +176,20 @@ describe("Test Alchemy Functions", function () {
             expect (shares).to.be.equal(2)
         });
 
+
+
         it("Should be possible to buyout", async function () {
+
+            let buyoutPrice = await alchemy._buyoutPrice()
+
             let overrides = {
-                value: "5000000000000000000"
+                value: buyoutPrice
             };
 
-            await alchemy.buyout(overrides)
+            await alchemy.connect(addr1).buyout(overrides)
 
             let ow = await minty.ownerOf(0)
-            expect(ow).to.be.equal(owner.address)
+            expect(ow).to.be.equal(addr1.address)
 
             console.log(await minty.ownerOf(0))
             console.log(await minty.ownerOf(1))

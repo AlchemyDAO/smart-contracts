@@ -10,7 +10,7 @@ const provider = waffle.provider;
 const encoder = defaultAbiCoder
 
 // test suite for Alchemy
-describe("Test nft transfer", function () {
+describe("Test buyout", function () {
 
     // variable to store the deployed smart contract
     let governorAlphaImplementation;
@@ -108,7 +108,7 @@ describe("Test nft transfer", function () {
                 1000000,
                 "TEST",
                 "CASE",
-                "1000000000000000000",
+                "500000000000000000",
                 5,
                 0
             );
@@ -128,23 +128,23 @@ describe("Test nft transfer", function () {
         });
 
 
-        it("Should be possible to make a proposal to return the nft", async function () {
+        it("Should be possible to make a proposal to add a nft", async function () {
+
             const goveroraddress = await alchemy._governor();
             const govcontract = await ethers.getContractAt("GovernorAlpha", goveroraddress);
 
             let parameters = encoder.encode(
-                [],
-                []
+                ["address","uint256"],
+                [minty.address,1]
             )
 
             await govcontract.propose(
                 [alchemy.address],
                 [0],
-                ["returnNft()"],
+                ["addNft(address,uint256)"],
                 [parameters],
-                "Test proposal to return the nft"
+                "Test proposal to add nft"
             );
-
 
             await ethers.provider.send("evm_mine")      // mine the next block
             await govcontract.castVote(1, true);
@@ -155,16 +155,139 @@ describe("Test nft transfer", function () {
             await ethers.provider.send("evm_mine")      // mine the next block
             await ethers.provider.send("evm_mine")      // mine the next block
             await ethers.provider.send("evm_mine")      // mine the next block
+
             await govcontract.queue(1)
 
             await ethers.provider.send("evm_mine")      // mine the next block
 
-            console.log(await minty.ownerOf(0))
+
+            let shares = await alchemy._nftCount()
+            expect (shares).to.be.equal(1)
+
+            await minty.approve(alchemy.address,1);
+            await minty.transferFrom(owner.address, alchemy.address,1);
 
             await govcontract.execute(1)
 
-            console.log(await minty.ownerOf(0))
+            console.log(await minty.ownerOf(1))
+            console.log(alchemy.address)
 
+            shares = await alchemy._nftCount()
+            expect (shares).to.be.equal(2)
+        });
+        it("Should be possible to make a proposal to add a nft", async function () {
+
+            const goveroraddress = await alchemy._governor();
+            const govcontract = await ethers.getContractAt("GovernorAlpha", goveroraddress);
+
+            let parameters = encoder.encode(
+                ["address","uint256"],
+                [minty.address,2]
+            )
+
+            await govcontract.propose(
+                [alchemy.address],
+                [0],
+                ["addNft(address,uint256)"],
+                [parameters],
+                "Test proposal to add nft"
+            );
+
+            await ethers.provider.send("evm_mine")      // mine the next block
+            await govcontract.castVote(2, true);
+
+            await ethers.provider.send("evm_increaseTime", [60*60*5])
+            await ethers.provider.send("evm_mine")      // mine the next block
+            await ethers.provider.send("evm_mine")      // mine the next block
+            await ethers.provider.send("evm_mine")      // mine the next block
+            await ethers.provider.send("evm_mine")      // mine the next block
+            await ethers.provider.send("evm_mine")      // mine the next block
+
+            await govcontract.queue(2)
+
+            await ethers.provider.send("evm_mine")      // mine the next block
+
+
+            let shares = await alchemy._nftCount()
+            expect (shares).to.be.equal(2)
+
+            await minty.approve(alchemy.address,2);
+            await minty.transferFrom(owner.address, alchemy.address,2);
+
+            await govcontract.execute(2)
+
+            console.log(await minty.ownerOf(2))
+            console.log(alchemy.address)
+
+            shares = await alchemy._nftCount()
+            expect (shares).to.be.equal(3)
+        });
+
+        it("Should be possible to make a proposal to buy a specific nft", async function () {
+            const goveroraddress = await alchemy._governor();
+            const govcontract = await ethers.getContractAt("GovernorAlpha", goveroraddress);
+
+            // send 1 eth
+            let overrides = {
+                value: "1000000000000000000"
+            };
+
+            await expect(alchemy.buySingleNft(1, overrides)).to.be.reverted;
+
+            let parameters = encoder.encode(
+                ["uint256","uint256","bool"],
+                [1, "1000000000000000000", true]
+            )
+
+            await govcontract.propose(
+                [alchemy.address],
+                [0],
+                ["setNftSale(uint256,uint256,bool)"],
+                [parameters],
+                "Test proposal to sell a single nft"
+            );
+
+            await ethers.provider.send("evm_mine")      // mine the next block
+            await govcontract.castVote(3, true);
+
+            await ethers.provider.send("evm_increaseTime", [60*60*5])
+            await ethers.provider.send("evm_mine")      // mine the next block
+            await ethers.provider.send("evm_mine")      // mine the next block
+            await ethers.provider.send("evm_mine")      // mine the next block
+            await ethers.provider.send("evm_mine")      // mine the next block
+            await ethers.provider.send("evm_mine")      // mine the next block
+
+            await govcontract.queue(3)
+
+            await ethers.provider.send("evm_mine")      // mine the next block
+
+
+            await govcontract.execute(3)
+
+            await alchemy.buySingleNft(1, overrides);
+
+            console.log(await minty.ownerOf(1))
+            console.log(alchemy.address)
+
+            let shares = await alchemy._nftCount()
+            expect (shares).to.be.equal(2)
+        });
+
+        it("Should be possible to buyout", async function () {
+
+            let buyoutPrice = await alchemy._buyoutPrice()
+
+            let overrides = {
+                value: buyoutPrice
+            };
+
+            await alchemy.connect(addr1).buyout(overrides)
+
+            let ow = await minty.ownerOf(0)
+            //expect(ow).to.be.equal(addr1.address)
+
+            console.log(await minty.ownerOf(0))
+            console.log(await minty.ownerOf(1))
         });
 
     })

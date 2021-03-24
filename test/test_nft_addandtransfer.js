@@ -10,7 +10,7 @@ const provider = waffle.provider;
 const encoder = defaultAbiCoder
 
 // test suite for Alchemy
-describe("Test Alchemy Functions", function () {
+describe("Test addandtransfer", function () {
 
     // variable to store the deployed smart contract
     let governorAlphaImplementation;

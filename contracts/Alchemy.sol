@@ -159,9 +159,9 @@ contract Alchemy is IERC20 {
         uint256 balance = balanceOf(msg.sender);
         _balances[msg.sender] = 0;
         uint256 contractBalalance = address(this).balance;
-        uint256 cashout = contractBalalance.mul(balance).div(_totalSupply);
+        uint256 cashOut = contractBalalance.mul(balance).div(_totalSupply);
         _burn(balance);
-        msg.sender.transfer(cashout);
+        msg.sender.transfer(cashOut);
         emit Transfer(msg.sender, address(0), balance);
     }
 
@@ -172,12 +172,12 @@ contract Alchemy is IERC20 {
     */
     function Buyshares(uint256 amount) external payable {
         require(_sharesForSale >= amount, "low shares");
-        require(msg.value >= amount.mul(_buyoutPrice).div(_totalSupply), "low value");
+        require(msg.value == amount.mul(_buyoutPrice).div(_totalSupply), "low value");
 
         _balances[msg.sender] = _balances[msg.sender].add(amount);
         _sharesForSale = _sharesForSale.sub(amount);
 
-        msg.sender.transfer(msg.value - amount.mul(_buyoutPrice).div(_totalSupply));
+        emit Transfer(address(0), msg.sender, amount);
     }
 
     /**
@@ -190,20 +190,17 @@ contract Alchemy is IERC20 {
         _balances[msg.sender] = 0;
 
         uint256 buyoutPriceWithDiscount = _buyoutPrice.mul((_totalSupply.sub(balance)).div(_totalSupply));
-        require(msg.value >= buyoutPriceWithDiscount, "buy value not met");
-
-        uint256 changeMoney = msg.value.sub(buyoutPriceWithDiscount);
+        require(msg.value == buyoutPriceWithDiscount, "buy value not met");
         _burn(balance);
 
         for (uint i=0; i<_nftCount; i++) {
-            _raisedNftArray[i].nftaddress.transferFrom(address(this), msg.sender, _raisedNftArray[i].tokenid);
+            _raisedNftArray[i].nftaddress.safeTransferFrom(address(this), msg.sender, _raisedNftArray[i].tokenid);
         }
 
         // Take 0.5% fee
         address payable alchemyRouter = IAlchemyFactory(_factoryContract).getAlchemyRouter();
         IAlchemyRouter(alchemyRouter).deposit{value:buyoutPriceWithDiscount / 200}();
 
-        msg.sender.transfer(changeMoney);
         emit Transfer(msg.sender, address(0), balance);
     }
 
@@ -261,19 +258,21 @@ contract Alchemy is IERC20 {
     */
     function buySingleNft(uint256 nftarrayid) external payable {
         require(_raisedNftArray[nftarrayid].forSale, "Not for sale");
-        require(msg.value >= _raisedNftArray[nftarrayid].price, "Price too low");
+        require(msg.value == _raisedNftArray[nftarrayid].price, "Price too low");
 
-        uint256 changeMoney = msg.value.sub(_raisedNftArray[nftarrayid].price);
-        _raisedNftArray[nftarrayid].nftaddress.transferFrom(address(this), msg.sender, _raisedNftArray[nftarrayid].tokenid);
+        _raisedNftArray[nftarrayid].nftaddress.safeTransferFrom(address(this), msg.sender, _raisedNftArray[nftarrayid].tokenid);
 
         // Take 0.5% fee
         address payable alchemyRouter = IAlchemyFactory(_factoryContract).getAlchemyRouter();
         IAlchemyRouter(alchemyRouter).deposit{value:_raisedNftArray[nftarrayid].price / 200}();
 
-        _nftCount--;
         _ownedAlready[address(_raisedNftArray[nftarrayid].nftaddress)][_raisedNftArray[nftarrayid].tokenid] = false;
-        delete _raisedNftArray[nftarrayid];
-        msg.sender.transfer(changeMoney);
+        _nftCount--;
+
+        for (uint i = nftarrayid; i < _raisedNftArray.length - 1; i++) {
+            _raisedNftArray[i] = _raisedNftArray[i+1];
+        }
+        _raisedNftArray.pop();
     }
 
     /**
@@ -309,10 +308,14 @@ contract Alchemy is IERC20 {
     * @notice returns the nft to the dao owner if allowed by the dao
     */
     function returnNft() onlyTimeLock external {
-        _raisedNftArray[0].nftaddress.transferFrom(address(this), _owner, _raisedNftArray[0].tokenid);
+        _raisedNftArray[0].nftaddress.safeTransferFrom(address(this), _owner, _raisedNftArray[0].tokenid);
         _nftCount--;
         _ownedAlready[address(_raisedNftArray[0].nftaddress)][_raisedNftArray[0].tokenid] = false;
-        delete _raisedNftArray[0];
+
+        for (uint i = 0; i < _raisedNftArray.length - 1; i++) {
+            _raisedNftArray[i] = _raisedNftArray[i+1];
+        }
+        _raisedNftArray.pop();
     }
 
     /**

@@ -284,7 +284,7 @@ describe("Test Alchemy Functions", function () {
   
           // send 1 eth
           let overrides = {
-              value: "3000000000000000000"
+              value: "1000000000000000000"
           };
   
           await expect(alchemy.buySingleNft(1, overrides)).to.be.reverted;
@@ -329,10 +329,17 @@ describe("Test Alchemy Functions", function () {
       });
   
       it("Should be possible to buy shares for sale", async function () {
-  
+
+          let totalsupply = await alchemy.totalSupply()
+          let buyout = await alchemy._buyoutPrice();
+
+          let valuer = BigNumber.from("500000000000000000").mul(buyout).div(totalsupply)
+
           let overrides = {
-              value: "5000000000000000000"
+              value: valuer
           };
+
+          console.log(valuer)
   
           let shares = await alchemy._sharesForSale()
           expect (shares).to.be.equal("1000000000000000000")
@@ -428,9 +435,12 @@ describe("Test Alchemy Functions", function () {
           let overrides = {
               value: "5000000000000000000"
           };
+
+          console.log(await alchemy._nftCount())
   
-          await alchemy.buyout(overrides)
-  
+          await alchemy.connect(addr1).buyout(overrides)
+
+          // should also be the owner cause we have 0 nfts in the dao
           let ow = await minty.ownerOf(0)
           expect(ow).to.be.equal(owner.address)
       });
