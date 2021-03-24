@@ -7,7 +7,6 @@ import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {SafeMath} from "@openzeppelin/contracts/math/SafeMath.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
-
 /// @author Alchemy Team
 /// @title Alchemy
 /// @notice The Alchemy contract wraps nfts into erc20
@@ -286,7 +285,6 @@ contract Alchemy is IERC20 {
     */
     function addNft(address new_nft, uint256 tokenid) onlyTimeLock public {
         require(_ownedAlready[new_nft][tokenid] == false, "ALC: Cant add duplicate NFT");
-
         _raisedNftStruct memory temp_struct;
         temp_struct.nftaddress = IERC721(new_nft);
         temp_struct.tokenid = tokenid;
@@ -303,7 +301,7 @@ contract Alchemy is IERC20 {
     * @param tokenid the if of the nft token
     */
     function transferFromAndAdd(address new_nft, uint256 tokenid) onlyTimeLock public {
-        IERC721(new_nft).transferFrom(msg.sender, address(this), tokenid);
+        IERC721(new_nft).transferFrom(IERC721(new_nft).ownerOf(tokenid), address(this), tokenid);
         addNft(new_nft, tokenid);
     }
 

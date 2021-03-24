@@ -47,14 +47,15 @@ describe("Test Alchemy Functions", function () {
             alc.address,
             alchemyImplementation.address,
             governorAlphaImplementation.address,
-            timelockImplementation.address
+            timelockImplementation.address,
+            owner.address
         );
 
         // deploy staking rewards
         stakingRewards = await deploy('StakingRewards', owner.address, owner.address, alc.address);
 
         // deploy router
-        alchemyRouter = await deploy('AlchemyRouter', stakingRewards.address, owner.address, alchemyFactory.address);
+        alchemyRouter = await deploy('AlchemyRouter', stakingRewards.address, owner.address);
 
         // deploy minty
         minty = await deploy(
@@ -85,7 +86,8 @@ describe("Test Alchemy Functions", function () {
     });
 
     it("Set up factory owner", async function () {
-        await alchemyFactory.newFactoryOwner(alchemyRouter.address);
+        //await alchemyFactory.newFactoryOwner(alchemyRouter.address);
+        await alchemyFactory.newAlchemyRouter(alchemyRouter.address)
     });
 
     it("Enter staking pool", async function () {
@@ -268,6 +270,9 @@ describe("Test Alchemy Functions", function () {
           await minty.transferFrom(owner.address, alchemy.address,1);
   
           await govcontract.execute(3)
+
+          console.log(await minty.ownerOf(1))
+          console.log(alchemy.address)
   
           shares = await alchemy._nftCount()
           expect (shares).to.be.equal(2)
@@ -315,6 +320,9 @@ describe("Test Alchemy Functions", function () {
           await govcontract.execute(4)
   
           await alchemy.buySingleNft(1, overrides);
+
+          console.log(await minty.ownerOf(1))
+          console.log(alchemy.address)
   
           let shares = await alchemy._nftCount()
           expect (shares).to.be.equal(1)
@@ -409,6 +417,11 @@ describe("Test Alchemy Functions", function () {
           await ethers.provider.send("evm_mine")      // mine the next block
   
           await govcontract.execute(6)
+
+          console.log(await minty.ownerOf(0))
+          console.log(await minty.ownerOf(1))
+
+
       });
   
       it("Should be possible to buyout", async function () {
