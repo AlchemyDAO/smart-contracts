@@ -40,9 +40,9 @@ contract Alchemy is IERC20 {
     // struct for raised nfts
     struct _raisedNftStruct {
         IERC721 nftaddress;
-        uint tokenid;
-        uint price;
         bool forSale;
+        uint256 tokenid;
+        uint256 price;
     }
 
     // The total number of NfTs in the DAO
