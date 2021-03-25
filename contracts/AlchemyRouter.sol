@@ -16,7 +16,7 @@ contract AlchemyRouter {
     IStakingRewards public stakingRewards;
     address payable public treasury;
     address public owner;
-    uint256 public threshold = 100000000000000000;
+    uint256 public threshold = 0.1 ether;
 
     constructor(IStakingRewards _stakingRewards, address payable _treasury) {
         stakingRewards = _stakingRewards;
@@ -32,11 +32,14 @@ contract AlchemyRouter {
     */
     function distribute() internal {
         uint256 amount = address(this).balance;
-        treasury.transfer(amount / 2);
-        payable(address(stakingRewards)).transfer(amount / 2);
-        stakingRewards.notifyRewardAmount(amount / 2);
 
-        emit FeeDistribution(treasury, address(stakingRewards), amount);
+        if (amount > threshold) {
+            treasury.transfer(amount / 2);
+            payable(address(stakingRewards)).transfer(amount / 2);
+            stakingRewards.notifyRewardAmount(amount / 2);
+
+            emit FeeDistribution(treasury, address(stakingRewards), amount);
+        }
     }
 
     /**
@@ -44,11 +47,7 @@ contract AlchemyRouter {
     * only executes the distribution logic if the contract balance is more than 0.1 ETH
     */
     function deposit() external payable {
-        uint256 balance = address(this).balance;
-
-        if (balance > threshold) {
-            distribute();
-        }
+        distribute();
     }
 
     /**
@@ -56,11 +55,7 @@ contract AlchemyRouter {
     * only executes the distribution logic if the contract balance is more than 0.1 ETH
     */
     fallback() external payable {
-        uint256 balance = address(this).balance;
-
-        if (balance > threshold) {
-            distribute();
-        }
+        distribute();
     }
 
     /**
@@ -68,25 +63,24 @@ contract AlchemyRouter {
     * only executes the distribution logic if the contract balance is more than 0.1 ETH
     */
     receive() external payable {
-        uint256 balance = address(this).balance;
-
-        if (balance > threshold) {
-            distribute();
-        }
+        distribute();
     }
 
     function newStakingrewards(IStakingRewards newRewards) public {
         require(msg.sender == owner, "Only owner");
+        require(address(newRewards) != address(0), "not zero address");
         stakingRewards = newRewards;
     }
 
-    function newTreasury(address payable newTrewasury) public {
+    function newTreasury(address payable newTreasuryAddress) public {
         require(msg.sender == owner, "Only owner");
-        treasury = newTrewasury;
+        require(newTreasuryAddress != address(0), "not zero address");
+        treasury = newTreasuryAddress;
     }
 
     function setNewOwner(address newOwner) public {
         require(msg.sender == owner, "Only owner");
+        require(newOwner != address(0), "not zero address");
         owner = newOwner;
     }
 

@@ -158,8 +158,8 @@ contract Alchemy is IERC20 {
     function burnForETH() external {
         uint256 balance = balanceOf(msg.sender);
         _balances[msg.sender] = 0;
-        uint256 contractBalalance = address(this).balance;
-        uint256 cashOut = contractBalalance.mul(balance).div(_totalSupply);
+        uint256 contractBalance = address(this).balance;
+        uint256 cashOut = contractBalance.mul(balance).div(_totalSupply);
         _burn(balance);
         msg.sender.transfer(cashOut);
         emit Transfer(msg.sender, address(0), balance);
@@ -170,7 +170,7 @@ contract Alchemy is IERC20 {
     *
     * @param amount the amount to be bought
     */
-    function BuyShares(uint256 amount) external payable {
+    function buyShares(uint256 amount) external payable {
         require(_sharesForSale >= amount, "low shares");
         require(msg.value == amount.mul(_buyoutPrice).div(_totalSupply), "low value");
 
@@ -193,8 +193,10 @@ contract Alchemy is IERC20 {
         require(msg.value == buyoutPriceWithDiscount, "buy value not met");
         _burn(balance);
 
+        _raisedNftStruct[] memory raisedNftArray = _raisedNftArray;
+
         for (uint i=0; i<_nftCount; i++) {
-            _raisedNftArray[i].nftaddress.safeTransferFrom(address(this), msg.sender, _raisedNftArray[i].tokenid);
+            raisedNftArray[i].nftaddress.safeTransferFrom(address(this), msg.sender, raisedNftArray[i].tokenid);
         }
 
         // Take 0.5% fee
@@ -401,7 +403,6 @@ contract Alchemy is IERC20 {
         _transferTokens(msg.sender, dst, amount);
         return true;
     }
-
 
     /**
     * fallback function for collection funds
