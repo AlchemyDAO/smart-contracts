@@ -310,9 +310,11 @@ contract Alchemy is IERC20 {
     * @notice returns the nft to the dao owner if allowed by the dao
     */
     function sendNftBackToOwner(uint256 nftarrayid) onlyTimeLock public {
-        _raisedNftArray[nftarrayid].nftaddress.safeTransferFrom(address(this), _owner, _raisedNftArray[nftarrayid].tokenid);
+        _raisedNftStruct memory singleNft = _raisedNftArray[nftarrayid];
+        singleNft.nftaddress.safeTransferFrom(address(this), _owner, singleNft.tokenid);
+
         _nftCount--;
-        _ownedAlready[address(_raisedNftArray[nftarrayid].nftaddress)][_raisedNftArray[nftarrayid].tokenid] = false;
+        _ownedAlready[address(singleNft.nftaddress)][singleNft.tokenid] = false;
 
         for (uint i = nftarrayid; i < _raisedNftArray.length - 1; i++) {
             _raisedNftArray[i] = _raisedNftArray[i+1];
