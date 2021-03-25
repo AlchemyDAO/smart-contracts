@@ -74,8 +74,8 @@ contract Alchemy is IERC20 {
 
     // A checkpoint for marking number of votes from a given block
     struct Checkpoint {
-        uint32 fromBlock;
         uint256 votes;
+        uint32 fromBlock;
     }
 
     // A record of votes checkpoints for each account, by index
@@ -170,7 +170,7 @@ contract Alchemy is IERC20 {
     *
     * @param amount the amount to be bought
     */
-    function Buyshares(uint256 amount) external payable {
+    function BuyShares(uint256 amount) external payable {
         require(_sharesForSale >= amount, "low shares");
         require(msg.value == amount.mul(_buyoutPrice).div(_totalSupply), "low value");
 
@@ -257,16 +257,18 @@ contract Alchemy is IERC20 {
     * @param nftarrayid the nftarray id
     */
     function buySingleNft(uint256 nftarrayid) external payable {
-        require(_raisedNftArray[nftarrayid].forSale, "Not for sale");
-        require(msg.value == _raisedNftArray[nftarrayid].price, "Price too low");
+        _raisedNftStruct memory singleNft = _raisedNftArray[nftarrayid];
 
-        _raisedNftArray[nftarrayid].nftaddress.safeTransferFrom(address(this), msg.sender, _raisedNftArray[nftarrayid].tokenid);
+        require(singleNft.forSale, "Not for sale");
+        require(msg.value == singleNft.price, "Price too low");
+
+        singleNft.nftaddress.safeTransferFrom(address(this), msg.sender, singleNft.tokenid);
 
         // Take 0.5% fee
         address payable alchemyRouter = IAlchemyFactory(_factoryContract).getAlchemyRouter();
-        IAlchemyRouter(alchemyRouter).deposit{value:_raisedNftArray[nftarrayid].price / 200}();
+        IAlchemyRouter(alchemyRouter).deposit{value:singleNft.price / 200}();
 
-        _ownedAlready[address(_raisedNftArray[nftarrayid].nftaddress)][_raisedNftArray[nftarrayid].tokenid] = false;
+        _ownedAlready[address(singleNft.nftaddress)][singleNft.tokenid] = false;
         _nftCount--;
 
         for (uint i = nftarrayid; i < _raisedNftArray.length - 1; i++) {
@@ -307,12 +309,12 @@ contract Alchemy is IERC20 {
     /**
     * @notice returns the nft to the dao owner if allowed by the dao
     */
-    function returnNft() onlyTimeLock external {
-        _raisedNftArray[0].nftaddress.safeTransferFrom(address(this), _owner, _raisedNftArray[0].tokenid);
+    function sendNftBackToOwner(uint256 nftarrayid) onlyTimeLock public {
+        _raisedNftArray[nftarrayid].nftaddress.safeTransferFrom(address(this), _owner, _raisedNftArray[nftarrayid].tokenid);
         _nftCount--;
-        _ownedAlready[address(_raisedNftArray[0].nftaddress)][_raisedNftArray[0].tokenid] = false;
+        _ownedAlready[address(_raisedNftArray[nftarrayid].nftaddress)][_raisedNftArray[nftarrayid].tokenid] = false;
 
-        for (uint i = 0; i < _raisedNftArray.length - 1; i++) {
+        for (uint i = nftarrayid; i < _raisedNftArray.length - 1; i++) {
             _raisedNftArray[i] = _raisedNftArray[i+1];
         }
         _raisedNftArray.pop();
@@ -454,8 +456,6 @@ contract Alchemy is IERC20 {
         if (spender != src && spenderAllowance != uint256(-1)) {
             uint256 newAllowance = spenderAllowance.sub(amount, "NFTDAO:amount exceeds");
             _allowances[src][spender] = newAllowance;
-
-            //emit Approval(src, spender, newAllowance);
         }
 
         _transferTokens(src, dst, amount);
@@ -607,7 +607,7 @@ contract Alchemy is IERC20 {
         if (nCheckpoints > 0 && checkpoints[delegatee][nCheckpoints - 1].fromBlock == blockNumber) {
             checkpoints[delegatee][nCheckpoints - 1].votes = newVotes;
         } else {
-            checkpoints[delegatee][nCheckpoints] = Checkpoint(blockNumber, newVotes);
+            checkpoints[delegatee][nCheckpoints] = Checkpoint(newVotes, blockNumber);
             numCheckpoints[delegatee] = nCheckpoints + 1;
         }
 

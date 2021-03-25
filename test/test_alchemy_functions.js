@@ -344,7 +344,7 @@ describe("Test Alchemy Functions", function () {
           let shares = await alchemy._sharesForSale()
           expect (shares).to.be.equal("1000000000000000000")
   
-          await alchemy.Buyshares("500000000000000000", overrides)
+          await alchemy.BuyShares("500000000000000000", overrides)
   
           shares = await alchemy._sharesForSale()
           expect (shares).to.be.equal("500000000000000000")
@@ -397,14 +397,20 @@ describe("Test Alchemy Functions", function () {
           const govcontract = await ethers.getContractAt("GovernorAlpha", goveroraddress);
   
           let parameters = encoder.encode(
-              [],
-              []
+              ["uint256"],
+              ["0"]
           )
+
+          //let parameters = encoder.encode(
+          //    [],
+          //    []
+          //)
   
           await govcontract.propose(
               [alchemy.address],
               [0],
-              ["returnNft()"],
+              //["sendNftBackToOwner()"],
+              ["sendNftBackToOwner(uint256)"],
               [parameters],
               "Test proposal to return the nft"
           );
