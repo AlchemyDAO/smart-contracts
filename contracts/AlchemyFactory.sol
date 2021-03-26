@@ -21,9 +21,9 @@ contract AlchemyFactory {
     // the factory owner
     address payable public factoryOwner;
     address payable public alchemyRouter;
-    address public immutable alchemyImplementation;
-    address public immutable governorAlphaImplementation;
-    address public immutable timelockImplementation;
+    address public alchemyImplementation;
+    address public governorAlphaImplementation;
+    address public timelockImplementation;
 
     // set ALC token
     constructor(
@@ -133,6 +133,36 @@ contract AlchemyFactory {
     function newFactoryOwner(address payable newOwner) external {
         require(msg.sender == factoryOwner, "Only owner");
         factoryOwner = newOwner;
+    }
+
+    /**
+     * @dev lets the owner change the address to another address
+     *
+     * @param newAlchemyImplementation_ the new address
+    */
+    function newAlchemyImplementation(address newAlchemyImplementation_) external {
+        require(msg.sender == factoryOwner, "Only owner");
+        alchemyImplementation = newAlchemyImplementation_;
+    }
+
+    /**
+     * @dev lets the owner change the address to another address
+     *
+     * @param newGovernorAlphaImplementation_ the new address
+    */
+    function newGovernorAlphayImplementation(address newGovernorAlphaImplementation_) external {
+        require(msg.sender == factoryOwner, "Only owner");
+        governorAlphaImplementation = newGovernorAlphaImplementation_;
+    }
+
+    /**
+     * @dev lets the owner change the address to another address
+     *
+     * @param newTimelockImplementation_ the new address
+    */
+    function newTimelockImplementation(address newTimelockImplementation_) external {
+        require(msg.sender == factoryOwner, "Only owner");
+        timelockImplementation = newTimelockImplementation_;
     }
 
     /**
