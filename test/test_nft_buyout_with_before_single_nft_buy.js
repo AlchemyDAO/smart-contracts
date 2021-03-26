@@ -290,6 +290,46 @@ describe("Test buyout", function () {
             console.log(await minty.ownerOf(1))
         });
 
+        it("Should not  possible to buyout", async function () {
+
+            let buyoutPrice = await alchemy._buyoutPrice()
+
+            let overrides = {
+                value: buyoutPrice
+            };
+
+            await expect(alchemy.connect(addr1).buyout(overrides)).to.be.revertedWith("ALC:Already bought out");
+        });
+
+        it("Should not  possible to buy single after", async function () {
+
+            let buyoutPrice = await alchemy._buyoutPrice()
+
+            let overrides = {
+                value: buyoutPrice
+            };
+
+            await expect(alchemy.connect(addr1).buySingleNft(1,overrides)).to.be.revertedWith("ALC:Already bought out");
+        });
+
+        it("Should not be possible to call buyout transfer by not the buyer", async function () {
+            await expect(alchemy.buyoutWithdraw([0])).to.be.revertedWith("can only be called by the buyer");
+        });
+
+        it("Should be able to call buyout withdraw", async function () {
+
+            console.log(await minty.ownerOf(0))
+            console.log(await minty.ownerOf(1))
+            console.log(await alchemy._nftCount())
+            console.log(await alchemy._raisedNftArray(0))
+            console.log(await alchemy._raisedNftArray(1))
+
+            await alchemy.connect(addr1).buyoutWithdraw([0,1]);
+
+            console.log(await minty.ownerOf(0))
+            console.log(await minty.ownerOf(1))
+        });
+
     })
 
 

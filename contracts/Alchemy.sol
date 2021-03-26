@@ -209,12 +209,6 @@ contract Alchemy is IERC20 {
         require(msg.value == buyoutPriceWithDiscount, "buy value not met");
         _burn(balance);
 
-        _raisedNftStruct[] memory raisedNftArray = _raisedNftArray;
-
-        for (uint i=0; i<_nftCount; i++) {
-            raisedNftArray[i].nftaddress.safeTransferFrom(address(this), msg.sender, raisedNftArray[i].tokenid);
-        }
-
         // Take 0.5% fee
         address payable alchemyRouter = IAlchemyFactory(_factoryContract).getAlchemyRouter();
         IAlchemyRouter(alchemyRouter).deposit{value:buyoutPriceWithDiscount / 200}();
@@ -236,7 +230,7 @@ contract Alchemy is IERC20 {
         _raisedNftStruct[] memory raisedNftArray = _raisedNftArray;
 
         for (uint i=0; i < nftids.length; i++) {
-            raisedNftArray[i].nftaddress.safeTransferFrom(address(this), msg.sender, raisedNftArray[i].tokenid);
+            raisedNftArray[nftids[i]].nftaddress.safeTransferFrom(address(this), msg.sender, raisedNftArray[nftids[i]].tokenid);
         }
     }
 
