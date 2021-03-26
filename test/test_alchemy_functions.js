@@ -344,7 +344,7 @@ describe("Test Alchemy Functions", function () {
           let shares = await alchemy._sharesForSale()
           expect (shares).to.be.equal("1000000000000000000")
   
-          await alchemy.BuyShares("500000000000000000", overrides)
+          await alchemy.buyShares("500000000000000000", overrides)
   
           shares = await alchemy._sharesForSale()
           expect (shares).to.be.equal("500000000000000000")
