@@ -126,7 +126,7 @@ contract Alchemy is IERC20 {
 
         _ownedAlready[address(nftAddress_)][tokenId_] = true;
 
-        _totalSupply = totalSupply_ * 10 ** 18;
+        _totalSupply = totalSupply_;
         _name = name_;
         _symbol = symbol_;
         _buyoutPrice = buyoutPrice_;
@@ -149,7 +149,7 @@ contract Alchemy is IERC20 {
     * @param amount the amount to be burned
     */
     function _burn(uint256 amount) internal {
-        _totalSupply -= amount;
+        _totalSupply = _totalSupply.sub(amount);
     }
 
     /**
@@ -189,7 +189,7 @@ contract Alchemy is IERC20 {
         uint256 balance = _balances[msg.sender];
         _balances[msg.sender] = 0;
 
-        uint256 buyoutPriceWithDiscount = _buyoutPrice.mul((_totalSupply.sub(balance)).div(_totalSupply));
+        uint256 buyoutPriceWithDiscount = _buyoutPrice.mul((_totalSupply.sub(balance)).mul(10**18).div(_totalSupply)).div(10**18);
         require(msg.value == buyoutPriceWithDiscount, "buy value not met");
         _burn(balance);
 
@@ -215,7 +215,7 @@ contract Alchemy is IERC20 {
         require(_sharesForSale >= amount, "Low shares");
 
         _burn(amount);
-        _sharesForSale -= amount;
+        _sharesForSale = _sharesForSale.sub(amount);
 
         emit Transfer(msg.sender, address(0), amount);
     }
@@ -226,8 +226,8 @@ contract Alchemy is IERC20 {
     * @param amount the amount to be minted
     */
     function mintSharesForSale(uint256 amount) onlyTimeLock external {
-        _totalSupply += amount;
-        _sharesForSale += amount;
+        _totalSupply = _totalSupply.add(amount);
+        _sharesForSale = _sharesForSale.add(amount);
 
         emit Transfer(address(0), address(this), amount);
     }

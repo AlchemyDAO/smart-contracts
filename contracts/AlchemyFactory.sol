@@ -12,7 +12,7 @@ import "./libraries/CloneLibrary.sol";
 contract AlchemyFactory {
     using CloneLibrary for address;
 
-    // event thats emitted when a new Alchemy Contract was minted
+    // event that is emitted when a new Alchemy Contract was minted
     event NewAlchemy(address alchemy, address governor, address timelock);
 
     // the Alchemy governance token
@@ -25,14 +25,14 @@ contract AlchemyFactory {
     address public governorAlphaImplementation;
     address public timelockImplementation;
 
-    // set ALC token
     constructor(
         IERC20 _alch,
         address _alchemyImplementation,
         address _governorAlphaImplementation,
         address _timelockImplementation,
         address payable _alchemyRouter
-    ) {
+    )
+    {
         alch = _alch;
         factoryOwner = msg.sender;
         alchemyImplementation = _alchemyImplementation;
@@ -106,7 +106,6 @@ contract AlchemyFactory {
             governor,
             timelock
         );
-
 
         // distribute gov token
         distributeAlch(100 * 10 ** 18);

@@ -88,7 +88,7 @@ contract ALCH {
     constructor(address account, address minter_, uint256 mintingAllowedAfter_) {
         require(
             mintingAllowedAfter_ >= block.timestamp,
-            "Alc::constructor: minting can only begin after deployment"
+            "Alch::constructor: minting can only begin after deployment"
         );
         balances[account] = uint96(totalSupply);
         emit Transfer(address(0), account, totalSupply);
