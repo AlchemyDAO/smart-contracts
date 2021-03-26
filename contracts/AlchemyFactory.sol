@@ -149,7 +149,7 @@ contract AlchemyFactory {
      *
      * @param newGovernorAlphaImplementation_ the new address
     */
-    function newGovernorAlphayImplementation(address newGovernorAlphaImplementation_) external {
+    function newGovernorAlphaImplementation(address newGovernorAlphaImplementation_) external {
         require(msg.sender == factoryOwner, "Only owner");
         governorAlphaImplementation = newGovernorAlphaImplementation_;
     }
