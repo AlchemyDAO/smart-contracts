@@ -77,9 +77,7 @@ contract AlchemyFactory {
         string memory symbol_,
         uint256 buyoutPrice_,
         uint256 votingPeriod_,
-        uint256 timelockDelay_,
-        uint256 quorumVotes_,
-        uint256 proposalThreshold_
+        uint256 timelockDelay_
     ) public returns (address alchemy, address governor, address timelock) {
         alchemy = alchemyImplementation.createClone();
         governor = governorAlphaImplementation.createClone();
@@ -88,11 +86,10 @@ contract AlchemyFactory {
         nftAddress_.transferFrom(msg.sender, alchemy, tokenId_);
 
         IGovernorAlpha(governor).initialize(
-          alchemy,
-          timelock,
-          quorumVotes_,
-          proposalThreshold_,
-          votingPeriod_
+            alchemy,
+            timelock,
+            totalSupply_,
+            votingPeriod_
         );
 
         ITimelock(timelock).initialize(governor, timelockDelay_);
@@ -206,11 +203,10 @@ interface IAlchemy {
 
 interface IGovernorAlpha {
     function initialize(
-      address nft_,
-      address timelock_,
-      uint quorumVotes_,
-      uint proposalThreshold_,
-      uint votingPeriod_
+        address nft_,
+        address timelock_,
+        uint supply_,
+        uint votingPeriod_
     ) external;
 }
 
