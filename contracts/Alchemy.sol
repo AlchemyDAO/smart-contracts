@@ -60,6 +60,9 @@ contract Alchemy is IERC20 {
     // the buyout price. once its met, all nfts will be transferred to the buyer
     uint256 public _buyoutPrice;
 
+    // the address which has bought the dao
+    address public _buyoutAddress;
+
     // representing the governance contract of the nft
     address public _governor;
 
@@ -143,6 +146,14 @@ contract Alchemy is IERC20 {
     }
 
     /**
+    * @notice modifier only if buyoutAddress is not initialized
+    */
+    modifier stillToBuy() {
+        require(_buyoutAddress == address(0), "ALC:Already bought out");
+        _;
+    }
+
+    /**
     * @dev Destroys `amount` tokens from `account`, reducing
     * and updating burn tokens for abstraction
     *
@@ -180,16 +191,21 @@ contract Alchemy is IERC20 {
         emit Transfer(address(0), msg.sender, amount);
     }
 
+    function getBuyoutPriceWithDiscount(address account) public view returns (uint256) {
+        uint256 balance = _balances[account];
+        return _buyoutPrice.mul((_totalSupply.sub(balance)).mul(10**18).div(_totalSupply)).div(10**18);
+    }
+
     /**
     * @notice Lets anyone buyout the whole dao if they send ETH according to the buyout price
     * all nfts will be transferred to the buyer
     * also a fee will be distributed 0.5%
     */
-    function buyout() external payable {
+    function buyout() external payable stillToBuy {
         uint256 balance = _balances[msg.sender];
         _balances[msg.sender] = 0;
 
-        uint256 buyoutPriceWithDiscount = _buyoutPrice.mul((_totalSupply.sub(balance)).mul(10**18).div(_totalSupply)).div(10**18);
+        uint256 buyoutPriceWithDiscount = getBuyoutPriceWithDiscount(msg.sender);
         require(msg.value == buyoutPriceWithDiscount, "buy value not met");
         _burn(balance);
 
@@ -203,7 +219,25 @@ contract Alchemy is IERC20 {
         address payable alchemyRouter = IAlchemyFactory(_factoryContract).getAlchemyRouter();
         IAlchemyRouter(alchemyRouter).deposit{value:buyoutPriceWithDiscount / 200}();
 
+        // set buyer address
+        _buyoutAddress = msg.sender;
+
         emit Transfer(msg.sender, address(0), balance);
+    }
+
+    /**
+    * @notice transfers specific nfts after the buyout happened
+    *
+    * @param nftids the aray of nft ids
+    */
+    function buyoutWithdraw(uint[] memory nftids) external {
+        require(msg.sender == _buyoutAddress, "can only be called by the buyer");
+
+        _raisedNftStruct[] memory raisedNftArray = _raisedNftArray;
+
+        for (uint i=0; i < nftids.length; i++) {
+            raisedNftArray[i].nftaddress.safeTransferFrom(address(this), msg.sender, raisedNftArray[i].tokenid);
+        }
     }
 
     /**
@@ -258,7 +292,7 @@ contract Alchemy is IERC20 {
     * takes a fee of 0.5% on sale
     * @param nftarrayid the nftarray id
     */
-    function buySingleNft(uint256 nftarrayid) external payable {
+    function buySingleNft(uint256 nftarrayid) stillToBuy external payable {
         _raisedNftStruct memory singleNft = _raisedNftArray[nftarrayid];
 
         require(singleNft.forSale, "Not for sale");

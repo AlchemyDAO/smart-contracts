@@ -210,7 +210,7 @@ contract Timelock {
 
     mapping (bytes32 => bool) public queuedTransactions;
 
-    constructor() public {
+    constructor() {
         // Don't allow implementation to be initialized.
         admin = address(1);
     }

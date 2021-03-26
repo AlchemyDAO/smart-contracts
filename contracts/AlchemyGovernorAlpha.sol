@@ -145,6 +145,8 @@ contract GovernorAlpha {
     ) external {
         require(address(nft) == address(0), "Already initialized");
         require(nft_ != address(0), "Invalid NFT address");
+        require(votingPeriod_ > 0, "Voting period cant be 0");
+
         nft = NftInterface(nft_);
         totalSupply = supply_;
         votingPeriod = votingPeriod_;
