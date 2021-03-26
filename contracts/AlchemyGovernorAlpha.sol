@@ -10,17 +10,14 @@ contract GovernorAlpha {
     // The name of this contract
     string public constant name = "NFT DAO Governor Alpha";
 
-    // supply of the governor token
-    uint public totalSupply;
-
     // The duration of voting on a proposal, in blocks
     uint public votingPeriod;
 
     // The number of votes in support of a proposal required in order for a quorum to be reached and for a vote to succeed
-    function quorumVotes() public view returns (uint) { return (totalSupply) / 100 * 4; } // 4% of NFT DAO
+    uint public quorumVotes; //() public view returns (uint) { return (totalSupply) / 100 * 4; } // 4% of NFT DAO
 
     // The number of votes required in order for a voter to become a proposer
-    function proposalThreshold() public view returns (uint) { return (totalSupply) / 100; } // 1% of NFT DAO
+    uint public proposalThreshold; //() public view returns (uint) { return (totalSupply) / 100; } // 1% of NFT DAO
 
     //e The maximum number of actions that can be included in a proposal
     function proposalMaxOperations() public pure returns (uint) { return 10; } // 10 actions
@@ -140,21 +137,26 @@ contract GovernorAlpha {
     function initialize(
       address nft_,
       address timelock_,
-      uint supply_,
+      uint quorumVotes_,
+      uint proposalThreshold_,
       uint votingPeriod_
     ) external {
         require(address(nft) == address(0), "Already initialized");
         require(nft_ != address(0), "Invalid NFT address");
         require(votingPeriod_ > 0, "Voting period cant be 0");
+        require(quorumVotes_ > 0);
+        require(proposalThreshold_ > 0);
+        require(quorumVotes_ > proposalThreshold_);
 
         nft = NftInterface(nft_);
-        totalSupply = supply_;
         votingPeriod = votingPeriod_;
+        quorumVotes = quorumVotes_;
+        proposalThreshold = proposalThreshold_;
         timelock = TimelockInterface(timelock_);
     }
 
     function propose(address[] memory targets, uint[] memory values, string[] memory signatures, bytes[] memory calldatas, string memory description) public returns (uint) {
-        require(nft.getPriorVotes(msg.sender, sub256(block.number, 1)) > proposalThreshold(), "GovernorAlpha::propose: proposer votes below proposal threshold");
+        require(nft.getPriorVotes(msg.sender, sub256(block.number, 1)) > proposalThreshold, "GovernorAlpha::propose: proposer votes below proposal threshold");
         require(targets.length == values.length && targets.length == signatures.length && targets.length == calldatas.length, "GovernorAlpha::propose: proposal function information arity mismatch");
         require(targets.length != 0, "GovernorAlpha::propose: must provide actions");
         require(targets.length <= proposalMaxOperations(), "GovernorAlpha::propose: too many actions");
@@ -224,7 +226,7 @@ contract GovernorAlpha {
         require(currentState != ProposalState.Executed, "GovernorAlpha::cancel: cannot cancel executed proposal");
 
         Proposal storage proposal = proposals[proposalId];
-        require(nft.getPriorVotes(proposal.proposer, sub256(block.number, 1)) < proposalThreshold(), "GovernorAlpha::cancel: proposer above threshold");
+        require(nft.getPriorVotes(proposal.proposer, sub256(block.number, 1)) < proposalThreshold, "GovernorAlpha::cancel: proposer above threshold");
 
         proposal.canceled = true;
         for (uint i = 0; i < proposal.targets.length; i++) {
@@ -252,7 +254,7 @@ contract GovernorAlpha {
             return ProposalState.Pending;
         } else if (block.number <= proposal.endBlock) {
             return ProposalState.Active;
-        } else if (proposal.forVotes <= proposal.againstVotes || proposal.forVotes < quorumVotes()) {
+        } else if (proposal.forVotes <= proposal.againstVotes || proposal.forVotes < quorumVotes) {
             return ProposalState.Defeated;
         } else if (proposal.eta == 0) {
             return ProposalState.Succeeded;
