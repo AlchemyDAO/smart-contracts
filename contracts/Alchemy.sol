@@ -191,6 +191,11 @@ contract Alchemy is IERC20 {
         emit Transfer(address(0), msg.sender, amount);
     }
 
+    /**
+    * @notice view function to get the discountet buyout price
+    *
+    * @param account the account
+    */
     function getBuyoutPriceWithDiscount(address account) public view returns (uint256) {
         uint256 balance = _balances[account];
         return _buyoutPrice.mul((_totalSupply.sub(balance)).mul(10**18).div(_totalSupply)).div(10**18);
@@ -202,11 +207,11 @@ contract Alchemy is IERC20 {
     * also a fee will be distributed 0.5%
     */
     function buyout() external payable stillToBuy {
-        uint256 balance = _balances[msg.sender];
-        _balances[msg.sender] = 0;
-
         uint256 buyoutPriceWithDiscount = getBuyoutPriceWithDiscount(msg.sender);
         require(msg.value == buyoutPriceWithDiscount, "buy value not met");
+
+        uint256 balance = _balances[msg.sender];
+        _balances[msg.sender] = 0;
         _burn(balance);
 
         // Take 0.5% fee
