@@ -23,7 +23,7 @@ contract StakingRewardsLP is IStakingRewards, RewardsDistributionRecipient, Reen
     IERC20 public stakingToken;
     uint256 public periodFinish = 0;
     uint256 public rewardRate = 0;
-    uint256 public rewardsDuration = 7 days;
+    uint256 public rewardsDuration = 14 days;
     uint256 public lastUpdateTime;
     uint256 public rewardPerTokenStored;
 

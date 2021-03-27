@@ -192,7 +192,7 @@ contract Alchemy is IERC20 {
     }
 
     /**
-    * @notice view function to get the discountet buyout price
+    * @notice view function to get the discounted buyout price
     *
     * @param account the account
     */
