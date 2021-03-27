@@ -190,7 +190,7 @@ library SafeMath {
 /// @author Alchemy Team
 /// @title Timelock
 /// @notice The Timelock Contract for Alchemys
-contract Timelock {
+contract AlchemyTimelock {
     using SafeMath for uint;
 
     event NewAdmin(address indexed newAdmin);

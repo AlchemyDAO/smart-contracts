@@ -5,7 +5,7 @@ pragma experimental ABIEncoderV2;
 import "./interfaces/ITimelock.sol";
 
 
-contract GovernorAlpha {
+contract AlchemyGovernorAlpha {
     /// @dev The name of this contract
     string public constant name = "Alchemy Governor Alpha";
 
