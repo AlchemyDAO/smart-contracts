@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "./interfaces/ITimelock.sol";
 
 
-contract Timelock is ITimelock {
+contract AlchemyTimelock is ITimelock {
   using SafeMath for uint256;
 
   event NewAdmin(address indexed newAdmin);
