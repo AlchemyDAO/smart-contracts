@@ -3,7 +3,10 @@
 Repository for the Alchemy Contracts
 
 ## Dapps
-You can find the rinkeby version of the Alchemy Dapp here: [https://rinkeby.alchemydao.com/](https://rinkeby.alchemydao.com)
+You can find the mainnet version of the Alchemy Dapp here: [https://alchemydao.com/](https://alchemydao.com)
+
+## Airdrop
+Holders of certain NFT projects can claim 20 $ALCH for free as an airdrop here [https://alchemydao.com/stake](https://alchemydao.com/stake)
 
 # Setup
 
