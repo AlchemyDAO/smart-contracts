@@ -297,8 +297,6 @@ contract Alchemy is IERC20 {
         require(singleNft.forSale, "Not for sale");
         require(msg.value == singleNft.price, "Price too low");
 
-        singleNft.nftaddress.safeTransferFrom(address(this), msg.sender, singleNft.tokenid);
-
         // Take 0.5% fee
         address payable alchemyRouter = IAlchemyFactory(_factoryContract).getAlchemyRouter();
         IAlchemyRouter(alchemyRouter).deposit{value:singleNft.price / 200}();
@@ -310,6 +308,8 @@ contract Alchemy is IERC20 {
             _raisedNftArray[i] = _raisedNftArray[i+1];
         }
         _raisedNftArray.pop();
+
+        singleNft.nftaddress.safeTransferFrom(address(this), msg.sender, singleNft.tokenid);
     }
 
     /**
@@ -342,11 +342,34 @@ contract Alchemy is IERC20 {
     }
 
     /**
+    * @notice adds an NFT collection to the DAO contract
+    *
+    * @param new_nft_array the address of the new nft
+    * @param tokenid_array the id of the nft token
+    */
+    function addNftCollection(address[] memory new_nft_array, uint256[] memory tokenid_array) onlyTimeLock public {
+        for (uint i = 0; i < new_nft_array.length - 1; i++) {
+            addNft(new_nft_array[i], tokenid_array[i]);
+        }
+    }
+
+    /**
+    * @notice transfers an NFT collection to the DAO contract
+    *
+    * @param new_nft_array the address of the new nft
+    * @param tokenid_array the id of the nft token
+    */
+    function transferFromAndAddCollection(address[] memory new_nft_array, uint256[] memory tokenid_array) onlyTimeLock public {
+        for (uint i = 0; i < new_nft_array.length - 1; i++) {
+            transferFromAndAdd(new_nft_array[i], tokenid_array[i]);
+        }
+    }
+
+    /**
     * @notice returns the nft to the dao owner if allowed by the dao
     */
     function sendNftBackToOwner(uint256 nftarrayid) onlyTimeLock public {
         _raisedNftStruct memory singleNft = _raisedNftArray[nftarrayid];
-        singleNft.nftaddress.safeTransferFrom(address(this), _owner, singleNft.tokenid);
 
         _nftCount--;
         _ownedAlready[address(singleNft.nftaddress)][singleNft.tokenid] = false;
@@ -355,6 +378,8 @@ contract Alchemy is IERC20 {
             _raisedNftArray[i] = _raisedNftArray[i+1];
         }
         _raisedNftArray.pop();
+
+        singleNft.nftaddress.safeTransferFrom(address(this), _owner, singleNft.tokenid);
     }
 
     /**
