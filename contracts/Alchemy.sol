@@ -348,7 +348,7 @@ contract Alchemy is IERC20 {
     * @param tokenid_array the id of the nft token
     */
     function addNftCollection(address[] memory new_nft_array, uint256[] memory tokenid_array) onlyTimeLock public {
-        for (uint i = 0; i < new_nft_array.length - 1; i++) {
+        for (uint i = 0; i <= new_nft_array.length - 1; i++) {
             addNft(new_nft_array[i], tokenid_array[i]);
         }
     }
@@ -360,7 +360,7 @@ contract Alchemy is IERC20 {
     * @param tokenid_array the id of the nft token
     */
     function transferFromAndAddCollection(address[] memory new_nft_array, uint256[] memory tokenid_array) onlyTimeLock public {
-        for (uint i = 0; i < new_nft_array.length - 1; i++) {
+        for (uint i = 0; i <= new_nft_array.length - 1; i++) {
             transferFromAndAdd(new_nft_array[i], tokenid_array[i]);
         }
     }
