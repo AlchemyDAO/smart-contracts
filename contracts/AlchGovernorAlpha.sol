@@ -482,6 +482,11 @@ contract AlchemyGovernorAlpha {
         emit VoteCast(voter, proposalId, support, votes);
     }
 
+    function __acceptAdmin() public {
+        require(msg.sender == address(timelock), "GovernorAlpha::__acceptAdmin: sender must be timelock");
+        timelock.acceptAdmin();
+    }
+
     function add256(uint256 a, uint256 b) internal pure returns (uint256) {
         uint256 c = a + b;
         require(c >= a, "addition overflow");
