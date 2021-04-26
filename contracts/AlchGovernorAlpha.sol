@@ -483,7 +483,6 @@ contract AlchemyGovernorAlpha {
     }
 
     function __acceptAdmin() public {
-        require(msg.sender == address(timelock), "GovernorAlpha::__acceptAdmin: sender must be timelock");
         timelock.acceptAdmin();
     }
 
