@@ -54,9 +54,6 @@ contract Alchemy is IERC20 {
     // mapping to store the already owned nfts
     mapping (address => mapping( uint256 => bool)) public _ownedAlready;
 
-    // the owner and creator of the contract
-    address public _owner;
-
     // the buyout price. once its met, all nfts will be transferred to the buyer
     uint256 public _buyoutPrice;
 
@@ -90,11 +87,21 @@ contract Alchemy is IERC20 {
     // A record of states for signing / validating signatures
     mapping (address => uint) public nonces;
 
-    // An event that is emitted when an account changes its delegate
+    // Events
     event DelegateChanged(address indexed delegator, address indexed fromDelegate, address indexed toDelegate);
-
-    // An event that is emitted when a delegate account's vote balance changes
     event DelegateVotesChanged(address indexed delegate, uint previousBalance, uint newBalance);
+    event Buyout(address buyer, uint256 price);
+    event BuyoutTransfer(address nftaddress, uint256 nftid);
+    event BurnedForEth(address account, uint256 reward);
+    event SharesBought(address account, uint256 amount);
+    event SharesBurned(uint256 amount);
+    event SharesMinted(uint256 amount);
+    event NewBuyoutPrice(uint256 price);
+    event NftSaleChanged(uint256 nftid, uint256 price, bool sale);
+    event SingleNftBought(address account, uint256 nftid, uint256 price);
+    event NftAdded(address nftaddress, uint256 nftid);
+    event NftTransferredAndAdded(address nftaddress, uint256 nftid);
+    event TransactionExecuted(address target, uint256 value, string signature, bytes data);
 
     constructor() {
         // Don't allow implementation to be initialized.
@@ -116,7 +123,6 @@ contract Alchemy is IERC20 {
         require(_factoryContract == address(0), "already initialized");
         require(factoryContract != address(0), "factory can not be null");
 
-        _owner = owner_;
         _factoryContract = factoryContract;
         _governor = governor_;
         _timelock = timelock_;
@@ -138,7 +144,7 @@ contract Alchemy is IERC20 {
         _name = name_;
         _symbol = symbol_;
         _buyoutPrice = buyoutPrice_;
-        _balances[_owner] = _totalSupply;
+        _balances[owner_] = _totalSupply;
         emit Transfer(address(0), owner_, _totalSupply);
     }
 
@@ -178,6 +184,8 @@ contract Alchemy is IERC20 {
         uint256 cashOut = contractBalance.mul(balance).div(_totalSupply);
         _burn(balance);
         msg.sender.transfer(cashOut);
+
+        emit BurnedForEth(msg.sender, cashOut);
         emit Transfer(msg.sender, address(0), balance);
     }
 
@@ -193,6 +201,7 @@ contract Alchemy is IERC20 {
         _balances[msg.sender] = _balances[msg.sender].add(amount);
         _sharesForSale = _sharesForSale.sub(amount);
 
+        emit SharesBought(msg.sender, amount);
         emit Transfer(address(0), msg.sender, amount);
     }
 
@@ -226,6 +235,7 @@ contract Alchemy is IERC20 {
         // set buyer address
         _buyoutAddress = msg.sender;
 
+        emit Buyout(msg.sender, buyoutPriceWithDiscount);
         emit Transfer(msg.sender, address(0), balance);
     }
 
@@ -241,6 +251,7 @@ contract Alchemy is IERC20 {
 
         for (uint i=0; i < nftids.length; i++) {
             raisedNftArray[nftids[i]].nftaddress.safeTransferFrom(address(this), msg.sender, raisedNftArray[nftids[i]].tokenid);
+            emit BuyoutTransfer(address(raisedNftArray[nftids[i]].nftaddress), raisedNftArray[nftids[i]].tokenid);
         }
     }
 
@@ -255,6 +266,7 @@ contract Alchemy is IERC20 {
         _burn(amount);
         _sharesForSale = _sharesForSale.sub(amount);
 
+        emit SharesBurned(amount);
         emit Transfer(msg.sender, address(0), amount);
     }
 
@@ -267,6 +279,7 @@ contract Alchemy is IERC20 {
         _totalSupply = _totalSupply.add(amount);
         _sharesForSale = _sharesForSale.add(amount);
 
+        emit SharesMinted(amount);
         emit Transfer(address(0), address(this), amount);
     }
 
@@ -277,6 +290,7 @@ contract Alchemy is IERC20 {
     */
     function changeBuyoutPrice(uint256 amount) onlyTimeLock external {
         _buyoutPrice = amount;
+        emit NewBuyoutPrice(amount);
     }
 
     /**
@@ -289,6 +303,8 @@ contract Alchemy is IERC20 {
     function setNftSale(uint256 nftarrayid, uint256 price, bool sale) onlyTimeLock external {
         _raisedNftArray[nftarrayid].forSale = sale;
         _raisedNftArray[nftarrayid].price = price;
+
+        emit NftSaleChanged(nftarrayid, price, sale);
     }
 
     /**
@@ -315,6 +331,8 @@ contract Alchemy is IERC20 {
         _raisedNftArray.pop();
 
         singleNft.nftaddress.safeTransferFrom(address(this), msg.sender, singleNft.tokenid);
+
+        emit SingleNftBought(msg.sender, nftarrayid, singleNft.price);
     }
 
     /**
@@ -333,6 +351,7 @@ contract Alchemy is IERC20 {
         _nftCount++;
 
         _ownedAlready[new_nft][tokenid] = true;
+        emit NftAdded(new_nft, tokenid);
     }
 
     /**
@@ -344,6 +363,8 @@ contract Alchemy is IERC20 {
     function transferFromAndAdd(address new_nft, uint256 tokenid) onlyTimeLock public {
         IERC721(new_nft).transferFrom(IERC721(new_nft).ownerOf(tokenid), address(this), tokenid);
         addNft(new_nft, tokenid);
+
+        emit NftTransferredAndAdded(new_nft, tokenid);
     }
 
     /**
@@ -371,23 +392,6 @@ contract Alchemy is IERC20 {
     }
 
     /**
-    * @notice returns the nft to the dao owner if allowed by the dao
-    */
-    function sendNftBackToOwner(uint256 nftarrayid) onlyTimeLock public {
-        _raisedNftStruct memory singleNft = _raisedNftArray[nftarrayid];
-
-        _nftCount--;
-        _ownedAlready[address(singleNft.nftaddress)][singleNft.tokenid] = false;
-
-        for (uint i = nftarrayid; i < _raisedNftArray.length - 1; i++) {
-            _raisedNftArray[i] = _raisedNftArray[i+1];
-        }
-        _raisedNftArray.pop();
-
-        singleNft.nftaddress.safeTransferFrom(address(this), _owner, singleNft.tokenid);
-    }
-
-    /**
     * @notice executes any transaction
     *
     * @param target the target of the call
@@ -408,6 +412,7 @@ contract Alchemy is IERC20 {
         (bool success, bytes memory returnData) = target.call{value:value}(callData);
         require(success, "ALC:exec reverted");
 
+        emit TransactionExecuted(target, value, signature, data);
         return returnData;
     }
 
