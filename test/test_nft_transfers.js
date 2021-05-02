@@ -44,7 +44,6 @@ describe("Test nft transfer", function () {
         // deploy alchemy factory
         alchemyFactory = await deploy(
             'AlchemyFactory',
-            alc.address,
             alchemyImplementation.address,
             governorAlphaImplementation.address,
             timelockImplementation.address,
@@ -102,9 +101,9 @@ describe("Test nft transfer", function () {
             await minty.approve(alchemyFactory.address, 0);
 
             const tx = await alchemyFactory.NFTDAOMint(
-                minty.address,
+                [minty.address],
                 owner.address,
-                0,
+                [0],
                 1000000,
                 "TEST",
                 "CASE",

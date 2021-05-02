@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.7.6;
+pragma solidity 0.7.6;
 pragma experimental ABIEncoderV2;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -90,10 +90,10 @@ contract Alchemy is IERC20 {
     // A record of states for signing / validating signatures
     mapping (address => uint) public nonces;
 
-    // An event thats emitted when an account changes its delegate
+    // An event that is emitted when an account changes its delegate
     event DelegateChanged(address indexed delegator, address indexed fromDelegate, address indexed toDelegate);
 
-    // An event thats emitted when a delegate account's vote balance changes
+    // An event that is emitted when a delegate account's vote balance changes
     event DelegateVotesChanged(address indexed delegate, uint previousBalance, uint newBalance);
 
     constructor() {
@@ -102,9 +102,9 @@ contract Alchemy is IERC20 {
     }
 
     function initialize(
-        IERC721 nftAddress_,
+        IERC721[] memory nftAddresses_,
         address owner_,
-        uint256 tokenId_,
+        uint256[] memory tokenIds_,
         uint256 totalSupply_,
         string memory name_,
         string memory symbol_,
@@ -121,13 +121,18 @@ contract Alchemy is IERC20 {
         _governor = governor_;
         _timelock = timelock_;
 
-        _raisedNftStruct memory temp_struct;
-        temp_struct.nftaddress = nftAddress_;
-        temp_struct.tokenid = tokenId_;
-        _raisedNftArray.push(temp_struct);
-        _nftCount++;
+        // process the Nfts in the array
+        for (uint i = 0; i < nftAddresses_.length; i++) {
+            _raisedNftArray.push(_raisedNftStruct({
+                nftaddress: nftAddresses_[i],
+                tokenid: tokenIds_[i],
+                forSale: false,
+                price: 0
+            }));
 
-        _ownedAlready[address(nftAddress_)][tokenId_] = true;
+            _ownedAlready[address(nftAddresses_[i])][tokenIds_[i]] = true;
+            _nftCount++;
+        }
 
         _totalSupply = totalSupply_;
         _name = name_;
@@ -227,7 +232,7 @@ contract Alchemy is IERC20 {
     /**
     * @notice transfers specific nfts after the buyout happened
     *
-    * @param nftids the aray of nft ids
+    * @param nftids the array of nft ids
     */
     function buyoutWithdraw(uint[] memory nftids) external {
         require(msg.sender == _buyoutAddress, "can only be called by the buyer");
@@ -314,7 +319,7 @@ contract Alchemy is IERC20 {
 
     /**
     * @notice adds a new nft to the nft array
-    * must be approved an transferred seperately
+    * must be approved and transferred extra
     *
     * @param new_nft the address of the new nft
     * @param tokenid the if of the nft token

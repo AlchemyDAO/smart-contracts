@@ -44,7 +44,6 @@ describe("Test Alchemy Functions", function () {
         // deploy alchemy factory
         alchemyFactory = await deploy(
             'AlchemyFactory',
-            alc.address,
             alchemyImplementation.address,
             governorAlphaImplementation.address,
             timelockImplementation.address,
@@ -102,9 +101,9 @@ describe("Test Alchemy Functions", function () {
           await minty.approve(alchemyFactory.address, 0);
 
           const tx = await alchemyFactory.NFTDAOMint(
-              minty.address,
+              [minty.address],
               owner.address,
-              0,
+              [0],
               1000000,
               "TEST",
               "CASE",
@@ -182,11 +181,18 @@ describe("Test Alchemy Functions", function () {
   
           let shares = await alchemy._sharesForSale()
           expect (shares).to.be.equal(0)
-  
+
+          let totalsupp = await alchemy.totalSupply()
+
           await governor.execute(1)
-  
+
+
+          let totalsuppnew = await alchemy.totalSupply()
           shares = await alchemy._sharesForSale()
           expect (shares).to.be.equal("1000000000000000000")
+
+          expect(BigNumber.from(totalsupp).add(shares)).to.be.equal(totalsuppnew)
+
       });
 
       it("Should be possible to make a proposal to increase buyout price", async function () {
@@ -343,9 +349,12 @@ describe("Test Alchemy Functions", function () {
   
           let shares = await alchemy._sharesForSale()
           expect (shares).to.be.equal("1000000000000000000")
-  
+
+
           await alchemy.buyShares("500000000000000000", overrides)
-  
+
+
+
           shares = await alchemy._sharesForSale()
           expect (shares).to.be.equal("500000000000000000")
       });

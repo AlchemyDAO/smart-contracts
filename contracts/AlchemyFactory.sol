@@ -15,9 +15,6 @@ contract AlchemyFactory {
     // event that is emitted when a new Alchemy Contract was minted
     event NewAlchemy(address alchemy, address governor, address timelock);
 
-    // the Alchemy governance token
-    IERC20 public alch;
-
     // the factory owner
     address payable public factoryOwner;
     address payable public alchemyRouter;
@@ -26,14 +23,12 @@ contract AlchemyFactory {
     address public timelockImplementation;
 
     constructor(
-        IERC20 _alch,
         address _alchemyImplementation,
         address _governorAlphaImplementation,
         address _timelockImplementation,
         address payable _alchemyRouter
     )
     {
-        alch = _alch;
         factoryOwner = msg.sender;
         alchemyImplementation = _alchemyImplementation;
         governorAlphaImplementation = _governorAlphaImplementation;
@@ -42,22 +37,11 @@ contract AlchemyFactory {
     }
 
     /**
-     * @dev distributes the ALCH token supply
-     *
-     * @param amount the amount to distribute
-    */
-    function distributeAlch(uint amount) internal {
-        if (alch.balanceOf(address(this)) >= amount) {
-            alch.transfer(msg.sender, amount);
-        }
-    }
-
-    /**
      * @dev mints a new Alchemy Contract
      *
-     * @param nftAddress_ the initial nft address to add to the contract
+     * @param nftAddresses_ the nft addresses array to add to the contract
      * @param owner_ the owner of the contract
-     * @param tokenId_ the token id of the nft to be added
+     * @param tokenIds_ the token id array of the nft to be added
      * @param totalSupply_ the total supply of the erc20
      * @param name_ the token name
      * @param symbol_ the token symbol
@@ -69,21 +53,26 @@ contract AlchemyFactory {
      * timelock - the address of the new timelock
     */
     function NFTDAOMint(
-        IERC721 nftAddress_,
+        IERC721[] memory nftAddresses_,
         address owner_,
-        uint256 tokenId_,
+        uint256[] memory tokenIds_,
         uint256 totalSupply_,
         string memory name_,
         string memory symbol_,
         uint256 buyoutPrice_,
         uint256 votingPeriod_,
         uint256 timelockDelay_
-    ) public returns (address alchemy, address governor, address timelock) {
+    ) external returns (address alchemy, address governor, address timelock) {
         alchemy = alchemyImplementation.createClone();
         governor = governorAlphaImplementation.createClone();
         timelock = timelockImplementation.createClone();
 
-        nftAddress_.transferFrom(msg.sender, alchemy, tokenId_);
+        emit NewAlchemy(alchemy, governor, timelock);
+
+        // transfer the nfts
+        for (uint i = 0; i < nftAddresses_.length; i++) {
+            nftAddresses_[i].transferFrom(msg.sender, alchemy, tokenIds_[i]);
+        }
 
         IGovernorAlpha(governor).initialize(
             alchemy,
@@ -95,9 +84,9 @@ contract AlchemyFactory {
         ITimelock(timelock).initialize(governor, timelockDelay_);
 
         IAlchemy(alchemy).initialize(
-            nftAddress_,
+            nftAddresses_,
             owner_,
-            tokenId_,
+            tokenIds_,
             totalSupply_,
             name_,
             symbol_,
@@ -106,22 +95,6 @@ contract AlchemyFactory {
             governor,
             timelock
         );
-
-        // distribute gov token
-        distributeAlch(100 * 10 ** 18);
-
-        emit NewAlchemy(alchemy, governor, timelock);
-    }
-
-    /**
-     * @dev lets the owner transfer alch token to another address
-     *
-     * @param dst the address to send the tokens
-     * @param amount the token amount
-    */
-    function transferAlch(address dst, uint256 amount) external {
-        require(msg.sender == factoryOwner, "Only owner");
-        alch.transfer(dst, amount);
     }
 
     /**
@@ -187,9 +160,9 @@ contract AlchemyFactory {
 
 interface IAlchemy {
     function initialize(
-        IERC721 nftAddress_,
+        IERC721[] memory nftAddresses_,
         address owner_,
-        uint256 tokenId_,
+        uint256[] memory tokenIds_,
         uint256 totalSupply_,
         string memory name_,
         string memory symbol_,
