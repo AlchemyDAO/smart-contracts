@@ -401,51 +401,6 @@ describe("Test Alchemy Functions", function () {
   
       });
   
-      it("Should be possible to make a proposal to return the nft", async function () {
-          const goveroraddress = await alchemy._governor();
-          const govcontract = await ethers.getContractAt("GovernorAlpha", goveroraddress);
-  
-          let parameters = encoder.encode(
-              ["uint256"],
-              ["0"]
-          )
-
-          //let parameters = encoder.encode(
-          //    [],
-          //    []
-          //)
-  
-          await govcontract.propose(
-              [alchemy.address],
-              [0],
-              //["sendNftBackToOwner()"],
-              ["sendNftBackToOwner(uint256)"],
-              [parameters],
-              "Test proposal to return the nft"
-          );
-  
-  
-          await ethers.provider.send("evm_mine")      // mine the next block
-          await govcontract.castVote(6, true);
-  
-          await ethers.provider.send("evm_increaseTime", [60*60*5])
-          await ethers.provider.send("evm_mine")      // mine the next block
-          await ethers.provider.send("evm_mine")      // mine the next block
-          await ethers.provider.send("evm_mine")      // mine the next block
-          await ethers.provider.send("evm_mine")      // mine the next block
-          await ethers.provider.send("evm_mine")      // mine the next block
-          await govcontract.queue(6)
-  
-          await ethers.provider.send("evm_mine")      // mine the next block
-  
-          await govcontract.execute(6)
-
-          console.log(await minty.ownerOf(0))
-          console.log(await minty.ownerOf(1))
-
-
-      });
-  
       it("Should be possible to buyout", async function () {
           let overrides = {
               value: "5000000000000000000"
@@ -455,9 +410,8 @@ describe("Test Alchemy Functions", function () {
   
           await alchemy.connect(addr1).buyout(overrides)
 
-          // should also be the owner cause we have 0 nfts in the dao
-          let ow = await minty.ownerOf(0)
-          expect(ow).to.be.equal(owner.address)
+
+          expect(await alchemy._buyoutAddress()).to.be.equal(addr1.address)
       });
   
       it("Should be possible to burnForETH", async function () {

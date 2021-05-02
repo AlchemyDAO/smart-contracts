@@ -157,6 +157,14 @@ contract Alchemy is IERC20 {
     }
 
     /**
+    * @notice modifier only timelock or buyout address can call these functions
+    */
+    modifier onlyTimeLockOrBuyer() {
+        require(msg.sender == _timelock || msg.sender == _buyoutAddress, "ALC:Only Timelock or Buyer can call");
+        _;
+    }
+
+    /**
     * @notice modifier only if buyoutAddress is not initialized
     */
     modifier stillToBuy() {
@@ -342,7 +350,7 @@ contract Alchemy is IERC20 {
     * @param new_nft the address of the new nft
     * @param tokenid the if of the nft token
     */
-    function addNft(address new_nft, uint256 tokenid) onlyTimeLock public {
+    function addNft(address new_nft, uint256 tokenid) onlyTimeLockOrBuyer public {
         require(_ownedAlready[new_nft][tokenid] == false, "ALC: Cant add duplicate NFT");
         _raisedNftStruct memory temp_struct;
         temp_struct.nftaddress = IERC721(new_nft);
@@ -360,7 +368,7 @@ contract Alchemy is IERC20 {
     * @param new_nft the address of the new nft
     * @param tokenid the if of the nft token
     */
-    function transferFromAndAdd(address new_nft, uint256 tokenid) onlyTimeLock public {
+    function transferFromAndAdd(address new_nft, uint256 tokenid) onlyTimeLockOrBuyer public {
         IERC721(new_nft).transferFrom(IERC721(new_nft).ownerOf(tokenid), address(this), tokenid);
         addNft(new_nft, tokenid);
 
@@ -373,7 +381,7 @@ contract Alchemy is IERC20 {
     * @param new_nft_array the address of the new nft
     * @param tokenid_array the id of the nft token
     */
-    function addNftCollection(address[] memory new_nft_array, uint256[] memory tokenid_array) onlyTimeLock public {
+    function addNftCollection(address[] memory new_nft_array, uint256[] memory tokenid_array) onlyTimeLockOrBuyer public {
         for (uint i = 0; i <= new_nft_array.length - 1; i++) {
             addNft(new_nft_array[i], tokenid_array[i]);
         }
@@ -385,7 +393,7 @@ contract Alchemy is IERC20 {
     * @param new_nft_array the address of the new nft
     * @param tokenid_array the id of the nft token
     */
-    function transferFromAndAddCollection(address[] memory new_nft_array, uint256[] memory tokenid_array) onlyTimeLock public {
+    function transferFromAndAddCollection(address[] memory new_nft_array, uint256[] memory tokenid_array) onlyTimeLockOrBuyer public {
         for (uint i = 0; i <= new_nft_array.length - 1; i++) {
             transferFromAndAdd(new_nft_array[i], tokenid_array[i]);
         }

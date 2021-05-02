@@ -221,59 +221,7 @@ describe("Test buyout", function () {
             shares = await alchemy._nftCount()
             expect (shares).to.be.equal(3)
         });
-
-        it("Should be possible to make a proposal to return the nft", async function () {
-            const goveroraddress = await alchemy._governor();
-            const govcontract = await ethers.getContractAt("GovernorAlpha", goveroraddress);
-
-            let parameters = encoder.encode(
-                ["uint256"],
-                ["0"]
-            )
-
-            //let parameters = encoder.encode(
-            //    [],
-            //    []
-            //)
-
-            await govcontract.propose(
-                [alchemy.address],
-                [0],
-                //["sendNftBackToOwner()"],
-                ["sendNftBackToOwner(uint256)"],
-                [parameters],
-                "Test proposal to return the nft"
-            );
-
-            await ethers.provider.send("evm_mine")      // mine the next block
-            await govcontract.castVote(3, true);
-
-            await ethers.provider.send("evm_increaseTime", [60*60*5])
-            await ethers.provider.send("evm_mine")      // mine the next block
-            await ethers.provider.send("evm_mine")      // mine the next block
-            await ethers.provider.send("evm_mine")      // mine the next block
-            await ethers.provider.send("evm_mine")      // mine the next block
-            await ethers.provider.send("evm_mine")      // mine the next block
-            await govcontract.queue(3)
-
-            await ethers.provider.send("evm_mine")      // mine the next block
-
-            console.log(await minty.ownerOf(0))
-
-            await govcontract.execute(3)
-
-            console.log(await minty.ownerOf(0))
-            console.log(await minty.ownerOf(1))
-
-            console.log(await alchemy._raisedNftArray(0))
-            console.log(await alchemy._raisedNftArray(1))
-
-
-        });
-
-
-
-    })
+        })
 
 
 });
