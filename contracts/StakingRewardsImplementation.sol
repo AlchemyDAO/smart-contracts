@@ -8,12 +8,9 @@ import "openzeppelin-solidity-2.3.0/contracts/utils/ReentrancyGuard.sol";
 
 // Inheritance
 import "./interfaces/IStakingRewards.sol";
-import "./RewardsDistributionRecipient.sol";
-import "./Pausable.sol";
-
 
 // https://docs.synthetix.io/contracts/source/contracts/stakingrewards
-contract StakingRewardsLP is IStakingRewards, RewardsDistributionRecipient, ReentrancyGuard, Pausable {
+contract StakingRewardsImplementation is IStakingRewards, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -33,11 +30,17 @@ contract StakingRewardsLP is IStakingRewards, RewardsDistributionRecipient, Reen
     uint256 private _totalSupply;
     mapping(address => uint256) private _balances;
 
+    uint public lastPauseTime;
+    bool public paused;
+
     // the address of the collateral contract factory
     address public factoryContract;
 
     // the contract owner
     address public owner;
+    address public nominatedOwner;
+
+    address public rewardsDistribution;
 
     /* ========== CONSTRUCTOR ========== */
 
@@ -67,9 +70,11 @@ contract StakingRewardsLP is IStakingRewards, RewardsDistributionRecipient, Reen
         stakingToken = IERC20(_stakingToken);
         rewardsDistribution = _rewardsDistribution;
         factoryContract = _factoryContract;
-        Owned(_owner);
 
         rewardsDuration = 28 days;
+
+        owner = _owner;
+        emit OwnerChanged(address(0), _owner);
     }
 
     /* ========== VIEWS ========== */
@@ -180,6 +185,44 @@ contract StakingRewardsLP is IStakingRewards, RewardsDistributionRecipient, Reen
         emit RewardsDurationUpdated(rewardsDuration);
     }
 
+    /**
+    * @notice Change the paused state of the contract
+    * @dev Only the contract owner may call this.
+    */
+    function setPaused(bool _paused) external onlyOwner {
+        // Ensure we're actually changing the state before we do anything
+        if (_paused == paused) {
+            return;
+        }
+
+        // Set our paused state.
+        paused = _paused;
+
+        // If applicable, set the last pause time.
+        if (paused) {
+            lastPauseTime = now;
+        }
+
+        // Let everyone know that our pause state has changed.
+        emit PauseChanged(paused);
+    }
+
+    function nominateNewOwner(address _owner) external onlyOwner {
+        nominatedOwner = _owner;
+        emit OwnerNominated(_owner);
+    }
+
+    function acceptOwnership() external {
+        require(msg.sender == nominatedOwner, "You must be nominated before you can accept ownership");
+        emit OwnerChanged(owner, nominatedOwner);
+        owner = nominatedOwner;
+        nominatedOwner = address(0);
+    }
+
+    function setRewardsDistribution(address _rewardsDistribution) external onlyOwner {
+        rewardsDistribution = _rewardsDistribution;
+    }
+
     /* ========== MODIFIERS ========== */
 
     modifier updateReward(address account) {
@@ -192,6 +235,25 @@ contract StakingRewardsLP is IStakingRewards, RewardsDistributionRecipient, Reen
         _;
     }
 
+    modifier notPaused {
+        require(!paused, "This action cannot be performed while the contract is paused");
+        _;
+    }
+
+    modifier onlyRewardsDistribution() {
+        require(msg.sender == rewardsDistribution, "Caller is not RewardsDistribution contract");
+        _;
+    }
+
+    modifier onlyOwner {
+        _onlyOwner();
+        _;
+    }
+
+    function _onlyOwner() private view {
+        require(msg.sender == owner, "Only the contract owner may perform this action");
+    }
+
     /* ========== EVENTS ========== */
 
     event RewardAdded(uint256 reward);
@@ -200,4 +262,7 @@ contract StakingRewardsLP is IStakingRewards, RewardsDistributionRecipient, Reen
     event RewardPaid(address indexed user, uint256 reward);
     event RewardsDurationUpdated(uint256 newDuration);
     event Recovered(address token, uint256 amount);
+    event PauseChanged(bool isPaused);
+    event OwnerNominated(address newOwner);
+    event OwnerChanged(address oldOwner, address newOwner);
 }
