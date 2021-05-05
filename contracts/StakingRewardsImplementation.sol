@@ -54,6 +54,7 @@ contract StakingRewardsImplementation is IStakingRewards, ReentrancyGuard {
         address _rewardsDistribution,
         address _rewardsToken,
         address _stakingToken,
+        uint256 _rewardsDuration,
         address _factoryContract
     )
     external
@@ -65,13 +66,14 @@ contract StakingRewardsImplementation is IStakingRewards, ReentrancyGuard {
         require(_rewardsDistribution != address(0), "_rewardsDistribution can not be null");
         require(_rewardsToken != address(0), "_rewardsToken can not be null");
         require(_stakingToken != address(0), "_stakingToken can not be null");
+        require(_rewardsDuration != 0, "_rewardsDuration can not be zero");
 
         rewardsToken = IERC20(_rewardsToken);
         stakingToken = IERC20(_stakingToken);
         rewardsDistribution = _rewardsDistribution;
         factoryContract = _factoryContract;
 
-        rewardsDuration = 28 days;
+        rewardsDuration = _rewardsDuration;
 
         owner = _owner;
         emit OwnerChanged(address(0), _owner);

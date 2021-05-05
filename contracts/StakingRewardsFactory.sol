@@ -33,7 +33,8 @@ contract StakingRewardsFactory {
         address _owner,
         address _rewardsDistribution,
         address _rewardsToken,
-        address _stakingToken
+        address _stakingToken,
+        uint256 _rewardsDuration
     )
     external
     returns (address stakingRewardsAddress)
@@ -47,6 +48,7 @@ contract StakingRewardsFactory {
             _rewardsDistribution,
             _rewardsToken,
             _stakingToken,
+            _rewardsDuration,
             address(this)
         );
     }
@@ -83,6 +85,7 @@ interface IStakingRewards {
         address _rewardsDistribution,
         address _rewardsToken,
         address _stakingToken,
+        uint256 _rewardsDuration,
         address _factoryContract
     ) external;
 }
