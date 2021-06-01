@@ -10,12 +10,15 @@ import {
     TransferHelper
 } from "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
 import {
-    NonfungiblePositionManager
-} from "@uniswap/v3-periphery/contracts/interfaces/NonfungiblePositionManager.sol";
+    INonfungiblePositionManager
+} from "@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol";
 import {Quoter} from "@uniswap/v3-periphery/contracts/lens/Quoter.sol";
 import {
     IUniswapV3Pool
 } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
+import {
+    PoolAddress
+} from "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
 
 /// @author Alchemy Team
 /// @title Alchemy
@@ -64,7 +67,7 @@ contract Alchemy is IERC20 {
     _raisedNftStruct[] public _raisedNftArray;
 
     // univ3 NFT for ease of access
-    _raisedNftStruct public immutable nonfungiblePosition;
+    _raisedNftStruct private nonfungiblePosition;
 
     // mapping to store the already owned nfts
     mapping(address => mapping(uint256 => bool)) public _ownedAlready;
@@ -106,15 +109,12 @@ contract Alchemy is IERC20 {
     mapping(address => uint256) public nonces;
 
     // PositionManager that operates upon NFT's
-    NonfungiblePositionManager private positionManager;
-
-    // In case we have above then we need this quoter to fetch the token pool address and other details
-    Quoter private poolQuoter;
+    INonfungiblePositionManager private positionManager;
 
     // in case we have the above we also take the token pool immediately
     IUniswapV3Pool private tokenPool;
 
-    // slippage multiplier 
+    // slippage multiplier
     uint256 private slippageMultiplier;
 
     // Events
@@ -187,28 +187,30 @@ contract Alchemy is IERC20 {
         }
 
         if (isFungibleLiquidityPosition_) {
-            positionManager = NonfungiblePositionManager(
+            positionManager = INonfungiblePositionManager(
                 0xC36442b4a4522E871399CD717aBDD847Ab11FE88
             ); //https://github.com/Uniswap/uniswap-v3-periphery/blob/main/deploys.md
             isFungibleLiquidityPosition = true;
             nonfungiblePosition = _raisedNftArray[0];
-            poolQuoter = Quoter(0xb27308f9F90D607463bb33eA1BeBb41C27CE5AB6);
 
             // immediately initialize tokenPool since it will be necessary for certain calculations
 
             (, , address token0, address token1, uint24 fee, , , , , , , ) =
                 positionManager.positions(nonfungiblePosition.tokenid);
-            tokenPool = IUniswapV3Pool(poolQuoter.getPool(token0, token1, fee));
+            tokenPool = IUniswapV3Pool(
+                PoolAddress.computeAddress(
+                    0x1F98431c8aD98523631AE4a59f267346ea31F984,
+                    PoolAddress.getPoolKey(token0, token1, fee)
+                )
+            );
 
             slippageMultiplier = slippageMultiplier_;
-
         } else {
             isFungibleLiquidityPosition = false;
-            nonfungiblePosition = 0;
+            // nonfungiblePosition = 0;
             // can change to make mutable
-            positionManager = 0;
-            poolQuoter = 0;
-            slippageMultiplier = 0;
+            // positionManager = 0;
+            // slippageMultiplier = 0;
         }
 
         _totalSupply = totalSupply_;
@@ -217,6 +219,10 @@ contract Alchemy is IERC20 {
         _buyoutPrice = buyoutPrice_;
         _balances[owner_] = _totalSupply;
         emit Transfer(address(0), owner_, _totalSupply);
+    }
+
+    function initializeNonfungiblePositionParameters(bool isFungibleLiquidityPosition) external {
+
     }
 
     /**
@@ -413,22 +419,6 @@ contract Alchemy is IERC20 {
     ////////////////////////////////////
     // UNIV3
 
-    /// @notice struct for increaseLiquidity functions
-    /// @param params tokenId The ID of the token for which liquidity is being increased,
-    /// amount0Desired The desired amount of token0 to be spent,
-    /// amount1Desired The desired amount of token1 to be spent,
-    /// amount0Min The minimum amount of token0 to spend, which serves as a slippage check,
-    /// amount1Min The minimum amount of token1 to spend, which serves as a slippage check,
-    /// deadline The time by which the transaction must be included to effect the change
-    struct IncreaseLiquidityParams {
-        uint256 tokenId;
-        uint256 amount0Desired;
-        uint256 amount1Desired;
-        uint256 amount0Min;
-        uint256 amount1Min;
-        uint256 deadline;
-    }
-
     event portionOfLiquidityAdded(
         address account,
         uint256 sharesReceived,
@@ -471,7 +461,7 @@ contract Alchemy is IERC20 {
 
         (uint128 newLiquidity, uint256 amount0, uint256 amount1) =
             positionManager.increaseLiquidity(
-                IncreaseLiquidityParams({
+                INonfungiblePositionManager.IncreaseLiquidityParams({
                     tokenId: nonfungiblePosition.tokenid,
                     amount0Desired: amount0ToTrySpend,
                     amount1Desired: amount1ToTrySpend,
@@ -498,28 +488,6 @@ contract Alchemy is IERC20 {
             amount0,
             amount1
         );
-    }
-
-    /// @param params tokenId The ID of the token for which liquidity is being decreased,
-    /// amount The amount by which liquidity will be decreased,
-    /// amount0Min The minimum amount of token0 that should be accounted for the burned liquidity,
-    /// amount1Min The minimum amount of token1 that should be accounted for the burned liquidity,
-    /// deadline The time by which the transaction must be included to effect the change
-    /// @return amount0 The amount of token0 accounted to the position's tokens owed
-    /// @return amount1 The amount of token1 accounted to the position's tokens owed
-    struct DecreaseLiquidityParams {
-        uint256 tokenId;
-        uint128 liquidity;
-        uint256 amount0Min;
-        uint256 amount1Min;
-        uint256 deadline;
-    }
-
-    struct CollectParams {
-        uint256 tokenId;
-        address recipient;
-        uint128 amount0Max;
-        uint128 amount1Max;
     }
 
     event portionOfLiquidityWithdrawn(
@@ -560,18 +528,21 @@ contract Alchemy is IERC20 {
             ,
             ,
             ,
+
         ) = positionManager.positions(nonfungiblePosition.tokenid);
 
         uint128 newLiquidity =
-            SafeMath128.div(
-                SafeMath128.mul(liquidity, totalSupply()),
-                oldTotalSupply
+            uint128(
+                SafeMath.div(
+                    SafeMath.mul(currentLiquidity, totalSupply()),
+                    oldTotalSupply
+                )
             );
 
         //  Decrease liquidity, tokens are accounted to position.
         (uint256 amount0, uint256 amount1) =
             positionManager.decreaseLiquidity(
-                DecreaseLiquidityParams({
+                INonfungiblePositionManager.DecreaseLiquidityParams({
                     tokenId: nonfungiblePosition.tokenid,
                     liquidity: (currentLiquidity - newLiquidity), // apparently it will exactly reduce the amount of liquidity but then possibly not give you all of the tokens back, // so sadly it can't be compensated in shares
                     amount0Min: minimumToken0Out, // min out
@@ -583,8 +554,8 @@ contract Alchemy is IERC20 {
         // collect from position
         (uint256 amount0Collected, uint256 amount1Collected) =
             positionManager.collect(
-                CollectParams({
-                    tokenId: tokenId,
+                INonfungiblePositionManager.CollectParams({
+                    tokenId: nonfungiblePosition.tokenid,
                     recipient: msg.sender,
                     amount0Max: uint128(amount0),
                     amount1Max: uint128(amount1)
@@ -599,36 +570,65 @@ contract Alchemy is IERC20 {
         );
     }
 
-    function quoteLiquidityForShares(uint256 shares, uint256 slippage)
-        public
-        view
-        returns (
-            uint256 amount0ToTrySpend,
-            uint256 amount1ToTrySpend,
-            uint256 amount0MinToSpend,
-            uint256 amount1MinToSpend
-        )
-    {
-        (uint160 sqrtPriceX96, , , , , , ) = tokenPool.slot0();
-
-        (, , , , , , , uint128 currentLiquidity, , , , ) =
-            positionManager.positions(nonfungiblePosition.tokenid);
-
-        // math: L = sqrt(token0Res * token1Res); one token is x = L/sqrt(P) other is y = L * sqrt(P)
-        // will need to add math checks for different sqrtPriceX96
-
-        uint256 currentAmountToken0 = currentLiquidity.div(sqrtPriceX96);
-        uint256 currentAmountToken1 = currentLiquidity.mul(sqrtPriceX96);
-        uint256 shareSupply = totalSupply();
-
-        amount0MinToSpend = (((shares.add(shareSupply)).mul(currentAmountToken0)).div(shareSupply)).sub(currentAmountToken0);
-        amount1MinToSpend = (((shares.add(shareSupply)).mul(currentAmountToken1)).div(shareSupply)).sub(currentAmountToken1);
-
-        amount0ToTrySpend = (slippage.mul(amount0MinToSpend)).div(slippageMultiplier);
-        amount1ToTrySpend = (slippage.mul(amount1MinToSpend)).div(slippageMultiplier);
-
-        return (amount0ToTrySpend, amount1ToTrySpend, amount0MinToSpend, amount1MinToSpend);
+    struct amountsToSpend {
+        uint256 amount0ToTrySpend;
+        uint256 amount1ToTrySpend;
+        uint256 amount0MinToSpend;
+        uint256 amount1MinToSpend;
     }
+
+    function returnSqrtPriceX96() internal view returns (uint160 sqrtPriceX96) {
+        (sqrtPriceX96, , , , , , ) = tokenPool.slot0();
+        return sqrtPriceX96;
+    }
+
+    function returnCurrentLiquidity()
+        internal
+        view
+        returns (uint128 currentLiquidity)
+    {
+        (, , , , , , , currentLiquidity, , , , ) = positionManager.positions(
+            nonfungiblePosition.tokenid
+        );
+
+        return currentLiquidity;
+    }
+
+    function quoteAmountToMinSpend(bool token, uint256 shares) internal view
+        returns (uint256 amountMinToSpend)
+    {
+        uint256 currentAmountToken = (!token)
+            ? returnCurrentLiquidity().div(returnSqrtPriceX96())
+            : returnCurrentLiquidity().mul(returnSqrtPriceX96());
+
+        amountMinToSpend = ((shares.add(totalSupply())).mul(currentAmountToken))
+            .div(totalSupply())
+            .sub(currentAmountToken);
+
+        return amountMinToSpend;
+    }
+
+    function quoteAmountToTrySpend(uint256 slippage, uint256 amountMinToSpend) internal view returns (uint256 amountToTrySpend) {
+        amountToTrySpend = (slippage.mul(amountMinToSpend)).div(slippageMultiplier);
+        return amountToTrySpend;
+    }
+
+    function quoteLiquidityForShares(uint256 shares, uint256 slippage)
+        external
+        view
+        returns (amountsToSpend memory amounts) {
+
+        amounts = amountsToSpend({
+            amount0MinToSpend: quoteAmountToMinSpend(false, shares),
+            amount1MinToSpend: quoteAmountToMinSpend(true, shares),
+            amount0ToTrySpend: quoteAmountToTrySpend(slippage, quoteAmountToMinSpend(false, shares)),
+            amount1ToTrySpend: quoteAmountToTrySpend(slippage, quoteAmountToMinSpend(true, shares))
+        });
+
+        return amounts;
+    }
+
+
     ////////////////////////////////////
 
     /**
@@ -915,6 +915,19 @@ contract Alchemy is IERC20 {
 
         _transferTokens(src, dst, amount);
         return true;
+    }
+
+    /** @dev Creates `amount` tokens and assigns them to `account`, increasing
+     * the total supply.
+     *
+     * Requirements:
+     *
+     * - `account` cannot be the zero address.
+     */
+    function _mint(address account, uint256 amount) internal {
+        require(account != address(0), "ERC20: mint to the zero address");
+        _totalSupply += amount;
+        _balances[account] += amount;
     }
 
     /**

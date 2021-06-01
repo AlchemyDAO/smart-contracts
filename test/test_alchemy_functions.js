@@ -111,6 +111,7 @@ describe("Test Alchemy Functions", function () {
               5,
               0
           );
+
           const { events, cumulativeGasUsed, gasUsed } = await tx.wait();
           console.log(`Cumulative: ${cumulativeGasUsed.toNumber()}`);
           console.log(`Gas: ${gasUsed.toNumber()}`)
