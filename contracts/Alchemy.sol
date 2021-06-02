@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.7.6;
+pragma solidity ^0.7.6;
 pragma experimental ABIEncoderV2;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -67,7 +67,7 @@ contract Alchemy is IERC20 {
     _raisedNftStruct[] public _raisedNftArray;
 
     // univ3 NFT for ease of access
-    _raisedNftStruct private nonfungiblePosition;
+    _raisedNftStruct public nonfungiblePosition;
 
     // mapping to store the already owned nfts
     mapping(address => mapping(uint256 => bool)) public _ownedAlready;
@@ -90,6 +90,9 @@ contract Alchemy is IERC20 {
     // boolean representing if univ3 NFT contract
     bool public isFungibleLiquidityPosition;
 
+    // bool representing if contract has been locked forever and cannot become a univ3 position
+    bool public permaNonfungiblePositionDisabled;
+
     // A record of each accounts delegate
     mapping(address => address) public delegates;
 
@@ -109,13 +112,13 @@ contract Alchemy is IERC20 {
     mapping(address => uint256) public nonces;
 
     // PositionManager that operates upon NFT's
-    INonfungiblePositionManager private positionManager;
+    INonfungiblePositionManager public positionManager;
 
     // in case we have the above we also take the token pool immediately
-    IUniswapV3Pool private tokenPool;
+    IUniswapV3Pool public tokenPool;
 
     // slippage multiplier
-    uint256 private slippageMultiplier;
+    uint256 public slippageMultiplier;
 
     // Events
     event DelegateChanged(
@@ -158,8 +161,6 @@ contract Alchemy is IERC20 {
         uint256 totalSupply_,
         string memory name_,
         string memory symbol_,
-        bool isFungibleLiquidityPosition_,
-        uint256 slippageMultiplier_,
         uint256 buyoutPrice_,
         address factoryContract,
         address governor_,
@@ -186,32 +187,14 @@ contract Alchemy is IERC20 {
             _nftCount++;
         }
 
-        if (isFungibleLiquidityPosition_) {
-            positionManager = INonfungiblePositionManager(
-                0xC36442b4a4522E871399CD717aBDD847Ab11FE88
-            ); //https://github.com/Uniswap/uniswap-v3-periphery/blob/main/deploys.md
-            isFungibleLiquidityPosition = true;
-            nonfungiblePosition = _raisedNftArray[0];
+        // no difference as to if it's initialized or not, but better than uninitialized
+        positionManager = INonfungiblePositionManager(
+            0xC36442b4a4522E871399CD717aBDD847Ab11FE88
+        ); //https://github.com/Uniswap/uniswap-v3-periphery/blob/main/deploys.md
 
-            // immediately initialize tokenPool since it will be necessary for certain calculations
-
-            (, , address token0, address token1, uint24 fee, , , , , , , ) =
-                positionManager.positions(nonfungiblePosition.tokenid);
-            tokenPool = IUniswapV3Pool(
-                PoolAddress.computeAddress(
-                    0x1F98431c8aD98523631AE4a59f267346ea31F984,
-                    PoolAddress.getPoolKey(token0, token1, fee)
-                )
-            );
-
-            slippageMultiplier = slippageMultiplier_;
-        } else {
-            isFungibleLiquidityPosition = false;
-            // nonfungiblePosition = 0;
-            // can change to make mutable
-            // positionManager = 0;
-            // slippageMultiplier = 0;
-        }
+        // leave false, if this becomes a nonfungible position then set true after 
+        isFungibleLiquidityPosition = false;
+        permaNonfungiblePositionDisabled = false;
 
         _totalSupply = totalSupply_;
         _name = name_;
@@ -219,6 +202,37 @@ contract Alchemy is IERC20 {
         _buyoutPrice = buyoutPrice_;
         _balances[owner_] = _totalSupply;
         emit Transfer(address(0), owner_, _totalSupply);
+    }
+
+    function initializeNonfungiblePosition(uint256 slippageMultiplier_)
+        external
+        isNonfungibleLockedForever()
+    {
+        // tell that this is a fungible liquidity position
+        isFungibleLiquidityPosition = true;
+        // for ease of access
+        nonfungiblePosition = _raisedNftArray[0];
+        // so that the function can't be called
+        permaNonfungiblePositionDisabled = true; 
+
+        // immediately initialize tokenPool since it will be necessary for certain calculations
+
+        (, , address token0, address token1, uint24 fee, , , , , , , ) =
+            positionManager.positions(nonfungiblePosition.tokenid);
+
+        tokenPool = IUniswapV3Pool(
+            PoolAddress.computeAddress(
+                0x1F98431c8aD98523631AE4a59f267346ea31F984,
+                PoolAddress.getPoolKey(token0, token1, fee)
+            )
+        );
+
+        // necessary
+        slippageMultiplier = slippageMultiplier_;
+    }
+
+    function lockForNonfungiblePositionPermanently() external isNonfungibleLockedForever() {
+        permaNonfungiblePositionDisabled = true;
     }
 
     /**
@@ -256,6 +270,14 @@ contract Alchemy is IERC20 {
             isFungibleLiquidityPosition,
             "Not a fungible liquidity position"
         );
+        _;
+    }
+
+    /**
+     * @notice modifier to determine if nonfungible is locked forevr
+     */
+    modifier isNonfungibleLockedForever() {
+        require(!permaNonfungiblePositionDisabled, "this DAO is locked forever and cannot become a nonfungible position");
         _;
     }
 
@@ -512,20 +534,8 @@ contract Alchemy is IERC20 {
         uint256 oldTotalSupply = totalSupply();
         _burn(burnerShares);
 
-        (
-            ,
-            ,
-            address token0,
-            address token1,
-            ,
-            ,
-            ,
-            uint128 currentLiquidity,
-            ,
-            ,
-            ,
-
-        ) = positionManager.positions(nonfungiblePosition.tokenid);
+        (, , , , , , , uint128 currentLiquidity, , , , ) =
+            positionManager.positions(nonfungiblePosition.tokenid);
 
         uint128 newLiquidity =
             uint128(
@@ -590,12 +600,15 @@ contract Alchemy is IERC20 {
         return currentLiquidity;
     }
 
-    function quoteAmountToMinSpend(bool token, uint256 shares) internal view
+    function quoteAmountToMinSpend(bool token, uint256 shares)
+        internal
+        view
         returns (uint256 amountMinToSpend)
     {
-        uint256 currentAmountToken = (!token)
-            ? returnCurrentLiquidity().div(returnSqrtPriceX96())
-            : returnCurrentLiquidity().mul(returnSqrtPriceX96());
+        uint256 currentAmountToken =
+            (!token)
+                ? returnCurrentLiquidity().div(returnSqrtPriceX96())
+                : returnCurrentLiquidity().mul(returnSqrtPriceX96());
 
         amountMinToSpend = ((shares.add(totalSupply())).mul(currentAmountToken))
             .div(totalSupply())
@@ -604,26 +617,37 @@ contract Alchemy is IERC20 {
         return amountMinToSpend;
     }
 
-    function quoteAmountToTrySpend(uint256 slippage, uint256 amountMinToSpend) internal view returns (uint256 amountToTrySpend) {
-        amountToTrySpend = (slippage.mul(amountMinToSpend)).div(slippageMultiplier);
+    function quoteAmountToTrySpend(uint256 slippage, uint256 amountMinToSpend)
+        internal
+        view
+        returns (uint256 amountToTrySpend)
+    {
+        amountToTrySpend = (slippage.mul(amountMinToSpend)).div(
+            slippageMultiplier
+        );
         return amountToTrySpend;
     }
 
     function quoteLiquidityForShares(uint256 shares, uint256 slippage)
         external
         view
-        returns (amountsToSpend memory amounts) {
-
+        returns (amountsToSpend memory amounts)
+    {
         amounts = amountsToSpend({
             amount0MinToSpend: quoteAmountToMinSpend(false, shares),
             amount1MinToSpend: quoteAmountToMinSpend(true, shares),
-            amount0ToTrySpend: quoteAmountToTrySpend(slippage, quoteAmountToMinSpend(false, shares)),
-            amount1ToTrySpend: quoteAmountToTrySpend(slippage, quoteAmountToMinSpend(true, shares))
+            amount0ToTrySpend: quoteAmountToTrySpend(
+                slippage,
+                quoteAmountToMinSpend(false, shares)
+            ),
+            amount1ToTrySpend: quoteAmountToTrySpend(
+                slippage,
+                quoteAmountToMinSpend(true, shares)
+            )
         });
 
         return amounts;
     }
-
 
     ////////////////////////////////////
 
