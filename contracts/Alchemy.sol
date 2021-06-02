@@ -456,7 +456,7 @@ contract Alchemy is IERC20 {
         uint256 amount1ToTrySpend,
         uint256 amount0MinToSpend,
         uint256 amount1MinToSpend
-    ) internal {
+    ) external FungibleLiquidityPositionCheck() {
         // get old liquidity
         (
             ,
@@ -525,7 +525,7 @@ contract Alchemy is IERC20 {
         uint256 burnerShares,
         uint256 minimumToken0Out,
         uint256 minimumToken1Out
-    ) internal {
+    ) external FungibleLiquidityPositionCheck() {
         // immediately burn tokens
         uint256 balance = balanceOf(msg.sender);
         require(balance >= burnerShares, "Can't burn more than you have");
@@ -631,6 +631,7 @@ contract Alchemy is IERC20 {
     function quoteLiquidityForShares(uint256 shares, uint256 slippage)
         external
         view
+        FungibleLiquidityPositionCheck()
         returns (amountsToSpend memory amounts)
     {
         amounts = amountsToSpend({
