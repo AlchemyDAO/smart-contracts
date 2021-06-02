@@ -221,10 +221,6 @@ contract Alchemy is IERC20 {
         emit Transfer(address(0), owner_, _totalSupply);
     }
 
-    function initializeNonfungiblePositionParameters(bool isFungibleLiquidityPosition) external {
-
-    }
-
     /**
      * @notice modifier only timelock can call these functions
      */
