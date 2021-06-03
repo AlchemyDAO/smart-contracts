@@ -30,7 +30,14 @@ contract MockToken is ERC20 {
 
     function selfDeployPool external {
         require(!poolDeployed, "only once");
-        poolAddress = v3Factory(address(this), 0xc778417E063141139Fce010982780140Aa0cD5Ab, 1000);
+        poolAddress = v3Factory.createPool(0xc778417E063141139Fce010982780140Aa0cD5Ab, address(this), 1000);
+        // ok so the price of the pools:
+        /// Price is represented as a sqrt(amountToken1/amountToken0) Q64.96 value
+        // 0 = weth9, 1 = this so sqrt(this/weth9)
+        /// sqrtPriceX96 the initial sqrt price of the pool as a Q64.96 // so 64 integer 96 fractional parts
+        uint160 sqrtPrice = 
+        poolAddress.initialize()
+
         poolDeployed = true;
     }
 
@@ -41,6 +48,8 @@ contract MockToken is ERC20 {
     }
 
     function mintNonfungibleLiquidityPosition() {
+
+
 
     }
 

@@ -583,7 +583,7 @@ contract Alchemy is IERC20 {
         uint256 amount1MinToSpend;
     }
 
-    function returnSqrtPriceX96() internal view returns (uint160 sqrtPriceX96) {
+    function returnSqrtPriceX96() internal view returns (uint256 sqrtPriceX96) {
         (sqrtPriceX96, , , , , , ) = tokenPool.slot0();
         return sqrtPriceX96;
     }
