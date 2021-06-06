@@ -24,13 +24,8 @@ describe("Test MockToken", function () {
 
         mockTokenContract = await mockTokenFactory.deploy();
 
-
-
-
         const gasUsed = mockTokenContract.deployTransaction.gasLimit.mul(mockTokenContract.deployTransaction.gasPrice)
         extraGasInfo = `${ethers.utils.formatEther(gasUsed)} ETH, tx hash ${mockTokenContract.deployTransaction.hash}, \n`
-
-
 
         console.log(
             chalk.cyan("MockToken"),
@@ -40,8 +35,6 @@ describe("Test MockToken", function () {
         console.log(
             chalk.grey(extraGasInfo)
         );
-
-
     });
 
     describe("SelfDeployPool()", () => {
@@ -54,13 +47,9 @@ describe("Test MockToken", function () {
             await expect (deploTX = await mockTokenContract.selfDeployPool()).to.emit(mockTokenContract, 'PoolInitialized');
             deploReceipt = await deploTX.wait();
 
-
             console.log(deploReceipt.logs);
 
-
         });
-
-
 
     });
 
