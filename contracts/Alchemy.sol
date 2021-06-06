@@ -19,6 +19,8 @@ import {
 import {
     PoolAddress
 } from "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
+import { FullMath } from "@uniswap/v3-core/contracts/libraries/FullMath.sol";
+
 
 /// @author Alchemy Team
 /// @title Alchemy
@@ -583,7 +585,7 @@ contract Alchemy is IERC20 {
         uint256 amount1MinToSpend;
     }
 
-    function returnSqrtPriceX96() internal view returns (uint256 sqrtPriceX96) {
+    function returnSqrtPriceX96() internal view returns (uint160 sqrtPriceX96) {
         (sqrtPriceX96, , , , , , ) = tokenPool.slot0();
         return sqrtPriceX96;
     }
@@ -591,13 +593,13 @@ contract Alchemy is IERC20 {
     function returnCurrentLiquidity()
         internal
         view
-        returns (uint128 currentLiquidity)
+        returns (uint256 currentLiquidity)
     {
         (, , , , , , , currentLiquidity, , , , ) = positionManager.positions(
             nonfungiblePosition.tokenid
         );
 
-        return currentLiquidity;
+        return uint256(currentLiquidity);
     }
 
     function quoteAmountToMinSpend(bool token, uint256 shares)
@@ -607,8 +609,8 @@ contract Alchemy is IERC20 {
     {
         uint256 currentAmountToken =
             (!token)
-                ? returnCurrentLiquidity().div(returnSqrtPriceX96())
-                : returnCurrentLiquidity().mul(returnSqrtPriceX96());
+                ? FullMath.mulDiv(returnCurrentLiquidity(), 1, returnSqrtPriceX96())
+                : (FullMath.mulDiv(returnCurrentLiquidity(), returnSqrtPriceX96(), 1) >> 96); // because both numbers are 2^96  enlarged basically so we have 2^192 and need to divide
 
         amountMinToSpend = ((shares.add(totalSupply())).mul(currentAmountToken))
             .div(totalSupply())
