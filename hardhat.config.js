@@ -1,6 +1,7 @@
 require("@nomiclabs/hardhat-waffle");
 require('dotenv').config();
-
+require("@tenderly/hardhat-tenderly");
+require("@nomiclabs/hardhat-etherscan");
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
 task("accounts", "Prints the list of accounts", async () => {
@@ -56,6 +57,15 @@ optimizer: {
       }
     ]
   },
-  mocha: { timeout: 999999 }
+  mocha: { timeout: 999999 },
+  // this is absolute garbage and doesn't work
+  tenderly: {
+    project: "spamfest",
+    username: "defri"
+  },
+  etherscan: {
+    apiKey: process.env.etherscanAPIKey
+  }
+
 };
 

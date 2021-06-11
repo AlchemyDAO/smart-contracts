@@ -16,18 +16,18 @@ import {
 } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
 import {IWETH9} from "./IWETH9.sol";
 import {SafeMath} from "@openzeppelin/contracts/math/SafeMath.sol";
+
 // testnet ether weth9 0xc778417E063141139Fce010982780140Aa0cD5Ab
 
 contract MockToken is ERC20 {
     using TransferHelper for address;
     using SafeMath for uint256;
+    using SafeMath for uint160;
 
-    address public poolAddress;
     bool public poolDeployed;
     uint256 public tokenId;
-    uint256 constant public MAX_INT = 115792089237316195423570985008687907853269984665640564039457584007913129639935;
-    address public token0;
-    address public token1;
+    uint256 public constant MAX_INT =
+        115792089237316195423570985008687907853269984665640564039457584007913129639935;
 
     IUniswapV3Factory public v3Factory;
     INonfungiblePositionManager public v3NPM;
@@ -43,8 +43,11 @@ contract MockToken is ERC20 {
     );
     event BalanceCheck(uint256);
 
-    constructor() ERC20("MockToken", "MOCK2536") {
+    constructor(uint256 contractBalance_, uint256 ownerBalance_)
+        ERC20("MockToken", "MOCK2536")
+    {
         poolDeployed = false;
+
         v3Factory = IUniswapV3Factory(
             0x1F98431c8aD98523631AE4a59f267346ea31F984
         );
@@ -52,34 +55,35 @@ contract MockToken is ERC20 {
             0xC36442b4a4522E871399CD717aBDD847Ab11FE88
         );
         weth9c = IWETH9(0xc778417E063141139Fce010982780140Aa0cD5Ab);
-        // mint an unnecessarily huge amount
-        _mint(address(this), 250e25);
-        _mint(msg.sender, 2e23);
+
+        _mint(address(this), contractBalance_);
+        _mint(msg.sender, ownerBalance_);
+
         emit BalanceCheck(weth9c.balanceOf(msg.sender));
     }
 
-    function selfDeployPool() external {
+    //always input sqrtPrice as if deciding this/weth
+
+    function selfDeployPool(uint160 price_, uint24 fee) external {
         require(!poolDeployed, "only once");
         // deploy pool with 1% fee in hundreths of bip so 0.0001*10000 = 1%
 
-        poolAddress = v3Factory.createPool(
-            0xc778417E063141139Fce010982780140Aa0cD5Ab,
-            address(this),
-            10000
-        );
+        address poolAddress =
+            v3Factory.createPool(
+                0xc778417E063141139Fce010982780140Aa0cD5Ab,
+                address(this),
+                fee
+            );
+
 
         deployedPool = IUniswapV3Pool(poolAddress);
 
+        price_ = (deployedPool.token1() == address(this)) ? uint160(price_ << 96) : uint160(uint160(1 << 96).div(price_));
 
-        // ok so the price of the pools:
-        // Price is represented as a sqrt(amountToken1/amountToken0) Q64.96 value
-        // 0 = weth9, 1 = this so sqrt(this/weth9)
-        // sqrt PriceX96 the initial sqrt price of the pool as a Q64.96 // so 64 integer 96 fractional parts
-        // we will set 25,000,000 so root 5000
+        deployedPool.initialize(price_);
 
-        uint160 sqrtPrice = uint160(100 << 96);
-        deployedPool.initialize(sqrtPrice);
-        PoolInitialized(poolAddress, sqrtPrice);
+        emit PoolInitialized(poolAddress, price_);
+
         poolDeployed = true;
     }
 
@@ -89,66 +93,72 @@ contract MockToken is ERC20 {
         weth9cAddress.send(msg.value);
     }
 
-    event recordad(address);
-
-    function test() internal {
-        emit recordad(msg.sender);
-    }
-
-    event Allowance(uint256);
-
     function mintNonfungibleLiquidityPosition(
-        uint256 maxAmount0,
-        uint256 maxAmount1,
-        uint256 minAmount0,
-        uint256 minAmount1
+        uint256 amountWETH_,
+        uint256 amountThis_,
+        uint256 amountWETH_min,
+        uint256 amountThis_min,
+        int24 tick0_,
+        int24 tick1_
     ) external {
 
         uint256 allowed = weth9c.allowance(msg.sender, address(this));
 
-        require(allowed >= maxAmount0, "cant send that much");
-
-        weth9c.transferFrom(msg.sender, address(this), maxAmount0);
-
-         // require(1 != 0, "test");
-
         require(
-            maxAmount0 <= weth9c.balanceOf(address(this)),
-            "not enough token0 and possibly token 1"
+            allowed >= amountWETH_,
+            "Please allow the contract to withdraw more WETH"
         );
-        require(maxAmount1 <= balanceOf(address(this)), "not enough of token1");
+
+        weth9c.transferFrom(msg.sender, address(this), amountWETH_);
+
+        require(amountThis_ <= balanceOf(address(this)), "this account needs more needs more of the tokens");
+
+        if (!(deployedPool.token1() == address(this))) {
+            (amountWETH_, amountWETH_min, amountThis_, amountThis_min) = (
+                amountThis_,
+                amountThis_min,
+                amountWETH_,
+                amountWETH_min
+            );
+
+            (tick0_, tick1_) = (tick1_*(-1), tick0_*(-1));
+        }
+
 
         uint128 liquidity;
         uint256 used0;
         uint256 used1;
 
         weth9c.approve(0xC36442b4a4522E871399CD717aBDD847Ab11FE88, MAX_INT);
-        _approve(address(this), 0xC36442b4a4522E871399CD717aBDD847Ab11FE88, MAX_INT);
 
-        require(maxAmount0 >= minAmount0 && maxAmount1 >= minAmount1, "max > min must be true");
-        require(weth9c.allowance(address(this), 0xC36442b4a4522E871399CD717aBDD847Ab11FE88) == MAX_INT, "nonf needs more allowance weth");
-        require(allowance(address(this), 0xC36442b4a4522E871399CD717aBDD847Ab11FE88) == MAX_INT, "nonf needs more allowance token");
+        _approve(
+            address(this),
+            0xC36442b4a4522E871399CD717aBDD847Ab11FE88,
+            MAX_INT
+        );
 
-        (,int24 tick, ,,,,) = deployedPool.slot0();
+        require(
+            amountWETH_ >= amountWETH_min && amountThis_ >= amountThis_min,
+            "max > min must be true"
+        );
 
         (tokenId, liquidity, used0, used1) = v3NPM.mint(
             INonfungiblePositionManager.MintParams({
                 token1: deployedPool.token1(),
                 token0: deployedPool.token0(),
                 fee: deployedPool.fee(),
-                tickLower: 88000,
-                tickUpper: 99000,
-                amount0Desired: maxAmount1,
-                amount1Desired: maxAmount0,
-                amount0Min: 1,
-                amount1Min: 1,
+                tickLower: tick0_,
+                tickUpper: tick1_,
+                amount0Desired: amountWETH_,
+                amount1Desired: amountThis_,
+                amount0Min: amountWETH_min,
+                amount1Min: amountThis_min,
                 recipient: address(this),
                 deadline: uint256(block.timestamp).add(4 minutes)
             })
         );
 
-
-        // weth9c.transferFrom(address(this), msg.sender, maxAmount0.sub(used0));
+        // weth9c.transferFrom(address(this), msg.sender, amountWETH_.sub(used0));
 
         emit NonfungibleLiquidityPositionMinted(
             tokenId,
@@ -156,5 +166,36 @@ contract MockToken is ERC20 {
             used0,
             used1
         );
+    }
+
+    event Liquidity(uint128);
+
+    function returnLiquidityOfPool() external returns (uint128 liq) {
+        liq = deployedPool.liquidity();
+        emit Liquidity(liq);
+        return liq;
+    }
+
+    event Fees(uint128, uint128);
+
+    function returnFeesOfPool()
+        external
+        returns (uint128 token0, uint128 token1)
+    {
+        (token0, token1) = deployedPool.protocolFees();
+        emit Fees(token0, token1);
+        // not letting implicit declares
+        return (token0, token1);
+    }
+
+    event FeesGlobal(uint256, uint256);
+
+    function returnFeesGlobal() external returns (uint256 fg1, uint256 fg2) {
+        (fg1, fg2) = (
+            deployedPool.feeGrowthGlobal0X128(),
+            deployedPool.feeGrowthGlobal1X128()
+        );
+        emit FeesGlobal(fg1, fg2);
+        return (fg1, fg2);
     }
 }
