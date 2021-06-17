@@ -14,7 +14,7 @@ import {
 import {
     IUniswapV3Pool
 } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
-import {IWETH9} from "./IWETH9.sol";
+import {IWETH9} from "@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol";
 import {SafeMath} from "@openzeppelin/contracts/math/SafeMath.sol";
 
 // testnet ether weth9 0xc778417E063141139Fce010982780140Aa0cD5Ab
@@ -66,7 +66,7 @@ contract MockToken is ERC20 {
 
     function selfDeployPool(uint160 price_, uint24 fee) external {
         require(!poolDeployed, "only once");
-        // deploy pool with 1% fee in hundreths of bip so 0.0001*10000 = 1%
+        // deploy pool with fee in hundreths of bip so 0.0001*fee = fee%
 
         address poolAddress =
             v3Factory.createPool(
@@ -74,7 +74,6 @@ contract MockToken is ERC20 {
                 address(this),
                 fee
             );
-
 
         deployedPool = IUniswapV3Pool(poolAddress);
 
@@ -166,6 +165,14 @@ contract MockToken is ERC20 {
             used0,
             used1
         );
+    }
+
+    event NFTTOKENID(uint256);
+
+    function transferNFT() external returns (uint256) {
+        v3NPM.safeTransferFrom(address(this), msg.sender, tokenId);
+        emit NFTTOKENID(tokenId);
+        return tokenId;
     }
 
     event Liquidity(uint128);

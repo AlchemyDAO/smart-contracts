@@ -19,8 +19,7 @@ import {
 import {
     PoolAddress
 } from "@uniswap/v3-periphery/contracts/libraries/PoolAddress.sol";
-import { FullMath } from "@uniswap/v3-core/contracts/libraries/FullMath.sol";
-
+import {FullMath} from "@uniswap/v3-core/contracts/libraries/FullMath.sol";
 
 /// @author Alchemy Team
 /// @title Alchemy
@@ -119,9 +118,6 @@ contract Alchemy is IERC20 {
     // in case we have the above we also take the token pool immediately
     IUniswapV3Pool public tokenPool;
 
-    // slippage multiplier
-    uint256 public slippageMultiplier;
-
     // Events
     event DelegateChanged(
         address indexed delegator,
@@ -194,7 +190,7 @@ contract Alchemy is IERC20 {
             0xC36442b4a4522E871399CD717aBDD847Ab11FE88
         ); //https://github.com/Uniswap/uniswap-v3-periphery/blob/main/deploys.md
 
-        // leave false, if this becomes a nonfungible position then set true after 
+        // leave false, if this becomes a nonfungible position then set true after
         isFungibleLiquidityPosition = false;
         permaNonfungiblePositionDisabled = false;
 
@@ -206,7 +202,7 @@ contract Alchemy is IERC20 {
         emit Transfer(address(0), owner_, _totalSupply);
     }
 
-    function initializeNonfungiblePosition(uint256 slippageMultiplier_)
+    function initializeNonfungiblePosition()
         external
         isNonfungibleLockedForever()
     {
@@ -215,7 +211,7 @@ contract Alchemy is IERC20 {
         // for ease of access
         nonfungiblePosition = _raisedNftArray[0];
         // so that the function can't be called
-        permaNonfungiblePositionDisabled = true; 
+        permaNonfungiblePositionDisabled = true;
 
         // immediately initialize tokenPool since it will be necessary for certain calculations
 
@@ -228,12 +224,12 @@ contract Alchemy is IERC20 {
                 PoolAddress.getPoolKey(token0, token1, fee)
             )
         );
-
-        // necessary
-        slippageMultiplier = slippageMultiplier_;
     }
 
-    function lockForNonfungiblePositionPermanently() external isNonfungibleLockedForever() {
+    function lockForNonfungiblePositionPermanently()
+        external
+        isNonfungibleLockedForever()
+    {
         permaNonfungiblePositionDisabled = true;
     }
 
@@ -279,7 +275,10 @@ contract Alchemy is IERC20 {
      * @notice modifier to determine if nonfungible is locked forevr
      */
     modifier isNonfungibleLockedForever() {
-        require(!permaNonfungiblePositionDisabled, "this DAO is locked forever and cannot become a nonfungible position");
+        require(
+            !permaNonfungiblePositionDisabled,
+            "this DAO is locked forever and cannot become a nonfungible position"
+        );
         _;
     }
 
@@ -445,6 +444,7 @@ contract Alchemy is IERC20 {
         uint256 amount0Added,
         uint256 amount1Added
     );
+    event checkadr(address);
 
     /**
      * @notice adds liquidity and mints shares based on added liquidity
@@ -459,6 +459,7 @@ contract Alchemy is IERC20 {
         uint256 amount0MinToSpend,
         uint256 amount1MinToSpend
     ) external FungibleLiquidityPositionCheck() {
+
         // get old liquidity
         (
             ,
@@ -472,12 +473,18 @@ contract Alchemy is IERC20 {
             ,
             ,
             ,
-
         ) = positionManager.positions(nonfungiblePosition.tokenid);
+
+        if (!(tokenPool.token1() == address(this))) {
+            (amount0ToTrySpend, amount1ToTrySpend, amount0MinToSpend, amount1MinToSpend) = (amount1ToTrySpend, amount0ToTrySpend, amount1MinToSpend, amount0MinToSpend);
+        }
 
         // transfer from liquidity provider to this contract
         token0.safeTransferFrom(msg.sender, address(this), amount0ToTrySpend);
         token1.safeTransferFrom(msg.sender, address(this), amount1ToTrySpend);
+
+        token0.call(abi.encodeWithSignature("approve(address,uint256)", address(positionManager), amount0ToTrySpend));
+        token1.call(abi.encodeWithSignature("approve(address,uint256)", address(positionManager), amount1ToTrySpend));
 
         (uint128 newLiquidity, uint256 amount0, uint256 amount1) =
             positionManager.increaseLiquidity(
@@ -532,6 +539,10 @@ contract Alchemy is IERC20 {
         uint256 balance = balanceOf(msg.sender);
         require(balance >= burnerShares, "Can't burn more than you have");
 
+        if (!(tokenPool.token1() == address(this))) {
+            (minimumToken0Out, minimumToken1Out) = (minimumToken1Out, minimumToken0Out);
+        }
+
         _balances[msg.sender] = balance - burnerShares;
         uint256 oldTotalSupply = totalSupply();
         _burn(burnerShares);
@@ -578,78 +589,45 @@ contract Alchemy is IERC20 {
         );
     }
 
-    struct amountsToSpend {
-        uint256 amount0ToTrySpend;
-        uint256 amount1ToTrySpend;
-        uint256 amount0MinToSpend;
-        uint256 amount1MinToSpend;
+    function getToken0() external view returns (address) {
+        return tokenPool.token0();
     }
 
-    function returnSqrtPriceX96() internal view returns (uint160 sqrtPriceX96) {
-        (sqrtPriceX96, , , , , , ) = tokenPool.slot0();
-        return sqrtPriceX96;
+    function getToken1() external view returns (address) {
+        return tokenPool.token1();
     }
 
-    function returnCurrentLiquidity()
-        internal
-        view
-        returns (uint256 currentLiquidity)
-    {
-        (, , , , , , , currentLiquidity, , , , ) = positionManager.positions(
-            nonfungiblePosition.tokenid
-        );
-
-        return uint256(currentLiquidity);
-    }
-
-    function quoteAmountToMinSpend(bool token, uint256 shares)
-        internal
-        view
-        returns (uint256 amountMinToSpend)
-    {
-        uint256 currentAmountToken =
-            (!token)
-                ? FullMath.mulDiv(returnCurrentLiquidity(), 1, returnSqrtPriceX96())
-                : (FullMath.mulDiv(returnCurrentLiquidity(), returnSqrtPriceX96(), 1) >> 96); // because both numbers are 2^96  enlarged basically so we have 2^192 and need to divide
-
-        amountMinToSpend = ((shares.add(totalSupply())).mul(currentAmountToken))
-            .div(totalSupply())
-            .sub(currentAmountToken);
-
-        return amountMinToSpend;
-    }
-
-    function quoteAmountToTrySpend(uint256 slippage, uint256 amountMinToSpend)
-        internal
-        view
-        returns (uint256 amountToTrySpend)
-    {
-        amountToTrySpend = (slippage.mul(amountMinToSpend)).div(
-            slippageMultiplier
-        );
-        return amountToTrySpend;
-    }
-
-    function quoteLiquidityForShares(uint256 shares, uint256 slippage)
+    function parseRevertReason(bytes memory reason)
         external
-        view
-        FungibleLiquidityPositionCheck()
-        returns (amountsToSpend memory amounts)
+        pure
+        returns (uint256)
     {
-        amounts = amountsToSpend({
-            amount0MinToSpend: quoteAmountToMinSpend(false, shares),
-            amount1MinToSpend: quoteAmountToMinSpend(true, shares),
-            amount0ToTrySpend: quoteAmountToTrySpend(
-                slippage,
-                quoteAmountToMinSpend(false, shares)
-            ),
-            amount1ToTrySpend: quoteAmountToTrySpend(
-                slippage,
-                quoteAmountToMinSpend(true, shares)
-            )
-        });
+        if (reason.length != 32) {
+            if (reason.length < 68) revert("Unexpected error");
+            assembly {
+                reason := add(reason, 0x04)
+            }
+            revert(abi.decode(reason, (string)));
+        }
+        return abi.decode(reason, (uint256));
+    }
 
-        return amounts;
+    function quoteLiquidityAddition(
+        uint256 amount0ToTrySpend,
+        uint256 amount1ToTrySpend,
+        uint256 amount0MinToSpend,
+        uint256 amount1MinToSpend
+    ) public returns (uint256) {
+        try
+            this.addPortionOfCurrentLiquidity(
+                amount0ToTrySpend,
+                amount1ToTrySpend,
+                amount0MinToSpend,
+                amount1MinToSpend
+            )
+        {} catch (bytes memory reason) {
+            return this.parseRevertReason(reason);
+        }
     }
 
     ////////////////////////////////////
