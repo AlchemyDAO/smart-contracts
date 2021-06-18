@@ -224,6 +224,9 @@ contract Alchemy is IERC20 {
                 PoolAddress.getPoolKey(token0, token1, fee)
             )
         );
+
+        // reset supply to 0
+        _totalSupply = 0;
     }
 
     function lockForNonfungiblePositionPermanently()
@@ -444,7 +447,9 @@ contract Alchemy is IERC20 {
         uint256 amount0Added,
         uint256 amount1Added
     );
-    event checkadr(address);
+
+    event supplynews(uint256);
+
 
     /**
      * @notice adds liquidity and mints shares based on added liquidity
@@ -457,9 +462,9 @@ contract Alchemy is IERC20 {
         uint256 amount0ToTrySpend,
         uint256 amount1ToTrySpend,
         uint256 amount0MinToSpend,
-        uint256 amount1MinToSpend
+        uint256 amount1MinToSpend,
+        address recipient
     ) external FungibleLiquidityPositionCheck() {
-
         // get old liquidity
         (
             ,
@@ -473,18 +478,41 @@ contract Alchemy is IERC20 {
             ,
             ,
             ,
+
         ) = positionManager.positions(nonfungiblePosition.tokenid);
 
         if (!(tokenPool.token1() == address(this))) {
-            (amount0ToTrySpend, amount1ToTrySpend, amount0MinToSpend, amount1MinToSpend) = (amount1ToTrySpend, amount0ToTrySpend, amount1MinToSpend, amount0MinToSpend);
+            (
+                amount0ToTrySpend,
+                amount1ToTrySpend,
+                amount0MinToSpend,
+                amount1MinToSpend
+            ) = (
+                amount1ToTrySpend,
+                amount0ToTrySpend,
+                amount1MinToSpend,
+                amount0MinToSpend
+            );
         }
 
         // transfer from liquidity provider to this contract
-        token0.safeTransferFrom(msg.sender, address(this), amount0ToTrySpend);
-        token1.safeTransferFrom(msg.sender, address(this), amount1ToTrySpend);
+        token0.safeTransferFrom(recipient, address(this), amount0ToTrySpend);
+        token1.safeTransferFrom(recipient, address(this), amount1ToTrySpend);
 
-        token0.call(abi.encodeWithSignature("approve(address,uint256)", address(positionManager), amount0ToTrySpend));
-        token1.call(abi.encodeWithSignature("approve(address,uint256)", address(positionManager), amount1ToTrySpend));
+        token0.call(
+            abi.encodeWithSignature(
+                "approve(address,uint256)",
+                address(positionManager),
+                amount0ToTrySpend
+            )
+        );
+        token1.call(
+            abi.encodeWithSignature(
+                "approve(address,uint256)",
+                address(positionManager),
+                amount1ToTrySpend
+            )
+        );
 
         (uint128 newLiquidity, uint256 amount0, uint256 amount1) =
             positionManager.increaseLiquidity(
@@ -498,23 +526,13 @@ contract Alchemy is IERC20 {
                 })
             );
 
-        uint256 sharesToMint =
-            uint256(newLiquidity.mul(totalSupply()).div(currentLiquidity)).sub(
-                totalSupply()
-            );
-
-        _mint(msg.sender, sharesToMint);
+        _mint(msg.sender, newLiquidity);
 
         // transfer back to sender unspent rest
-        token0.safeTransfer(msg.sender, amount0ToTrySpend.sub(amount0));
-        token1.safeTransfer(msg.sender, amount1ToTrySpend.sub(amount1));
+        token0.safeTransfer(recipient, amount0ToTrySpend.sub(amount0));
+        token1.safeTransfer(recipient, amount1ToTrySpend.sub(amount1));
 
-        emit portionOfLiquidityAdded(
-            msg.sender,
-            sharesToMint,
-            amount0,
-            amount1
-        );
+        emit portionOfLiquidityAdded(recipient, newLiquidity, amount0, amount1);
     }
 
     event portionOfLiquidityWithdrawn(
@@ -531,39 +549,36 @@ contract Alchemy is IERC20 {
      * @param minimumToken1Out min amount of token 0 you want back
      * */
     function withdrawPortionOfCurrentLiquidity(
-        uint256 burnerShares,
+        uint128 burnerShares,
         uint256 minimumToken0Out,
-        uint256 minimumToken1Out
+        uint256 minimumToken1Out,
+        address recipient_
     ) external FungibleLiquidityPositionCheck() {
         // immediately burn tokens
-        uint256 balance = balanceOf(msg.sender);
+        uint256 balance = balanceOf(recipient_);
         require(balance >= burnerShares, "Can't burn more than you have");
 
         if (!(tokenPool.token1() == address(this))) {
-            (minimumToken0Out, minimumToken1Out) = (minimumToken1Out, minimumToken0Out);
+            (minimumToken0Out, minimumToken1Out) = (
+                minimumToken1Out,
+                minimumToken0Out
+            );
         }
 
-        _balances[msg.sender] = balance - burnerShares;
-        uint256 oldTotalSupply = totalSupply();
+        _balances[recipient_] = balance.sub(burnerShares);
         _burn(burnerShares);
 
         (, , , , , , , uint128 currentLiquidity, , , , ) =
             positionManager.positions(nonfungiblePosition.tokenid);
 
-        uint128 newLiquidity =
-            uint128(
-                SafeMath.div(
-                    SafeMath.mul(currentLiquidity, totalSupply()),
-                    oldTotalSupply
-                )
-            );
+        uint128 newLiquidity = uint128(currentLiquidity.sub(burnerShares));
 
         //  Decrease liquidity, tokens are accounted to position.
         (uint256 amount0, uint256 amount1) =
             positionManager.decreaseLiquidity(
                 INonfungiblePositionManager.DecreaseLiquidityParams({
                     tokenId: nonfungiblePosition.tokenid,
-                    liquidity: (currentLiquidity - newLiquidity), // apparently it will exactly reduce the amount of liquidity but then possibly not give you all of the tokens back, // so sadly it can't be compensated in shares
+                    liquidity: newLiquidity, // apparently it will exactly reduce the amount of liquidity but then possibly not give you all of the tokens back, // so sadly it can't be compensated in shares
                     amount0Min: minimumToken0Out, // min out
                     amount1Min: minimumToken1Out, // min out
                     deadline: block.timestamp // will look into
@@ -575,14 +590,14 @@ contract Alchemy is IERC20 {
             positionManager.collect(
                 INonfungiblePositionManager.CollectParams({
                     tokenId: nonfungiblePosition.tokenid,
-                    recipient: msg.sender,
+                    recipient: recipient_,
                     amount0Max: uint128(amount0),
                     amount1Max: uint128(amount1)
                 })
             );
 
         emit portionOfLiquidityWithdrawn(
-            msg.sender,
+            recipient_,
             burnerShares,
             amount0Collected,
             amount1Collected
@@ -623,7 +638,8 @@ contract Alchemy is IERC20 {
                 amount0ToTrySpend,
                 amount1ToTrySpend,
                 amount0MinToSpend,
-                amount1MinToSpend
+                amount1MinToSpend,
+                msg.sender
             )
         {} catch (bytes memory reason) {
             return this.parseRevertReason(reason);

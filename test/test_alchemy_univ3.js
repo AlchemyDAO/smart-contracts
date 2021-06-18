@@ -35,7 +35,7 @@ describe("Test Alchemy Functions", function () {
 
     let overrides = {
       gasLimit: ethers.utils.parseUnits("7800000", "wei"),
-      gasPrice: ethers.utils.parseUnits("11", "gwei")
+      gasPrice: ethers.utils.parseUnits("20", "gwei")
     };
 
   // initial deployment of Conjure Factory
@@ -169,8 +169,8 @@ describe("Test Alchemy Functions", function () {
 
       //await WETH9Contract.transferFrom(deployingWallet.address, mockTokenContract.address, ethers.utils.parseEther("0.01"), overrides);
       await mockTokenContract.mintNonfungibleLiquidityPosition(
-        ethers.utils.parseEther("0.05"),
-        ethers.utils.parseEther("5"),
+        ethers.utils.parseEther("0.03"),
+        ethers.utils.parseEther("3"),
         ethers.utils.parseEther("0"),
         ethers.utils.parseEther("0"),
         ethers.utils.parseUnits("50000", "wei"),
@@ -271,9 +271,9 @@ describe("Test Alchemy Functions", function () {
 
     // test univ3
     it("DAO Univ3 Functions test", async () => {
-      await alchemy.addPortionOfCurrentLiquidity(
+      await alchemy.quoteLiquidityAddition(
         ethers.utils.parseEther("0.001"),
-        ethers.utils.parseEther("0.0001"),
+        ethers.utils.parseEther("0.1"),
         ethers.utils.parseEther("0"),
         ethers.utils.parseEther("0"),
         overrides
