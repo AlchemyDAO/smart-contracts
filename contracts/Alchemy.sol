@@ -118,72 +118,32 @@ contract Alchemy is IERC20 {
     // in case we have the above we also take the token pool immediately
     IUniswapV3Pool public tokenPool;
 
-    // Events
-    event DelegateChanged(
-        address indexed delegator,
-        address indexed fromDelegate,
-        address indexed toDelegate
-    );
-    event DelegateVotesChanged(
-        address indexed delegate,
-        uint256 previousBalance,
-        uint256 newBalance
-    );
-    event Buyout(address buyer, uint256 price);
-    event BuyoutTransfer(address nftaddress, uint256 nftid);
-    event BurnedForEth(address account, uint256 reward);
-    event SharesBought(address account, uint256 amount);
-    event SharesBurned(uint256 amount);
-    event SharesMinted(uint256 amount);
-    event NewBuyoutPrice(uint256 price);
-    event NftSaleChanged(uint256 nftid, uint256 price, bool sale);
-    event SingleNftBought(address account, uint256 nftid, uint256 price);
-    event NftAdded(address nftaddress, uint256 nftid);
-    event NftTransferredAndAdded(address nftaddress, uint256 nftid);
-    event TransactionExecuted(
-        address target,
-        uint256 value,
-        string signature,
-        bytes data
-    );
-
     constructor() {
         // Don't allow implementation to be initialized.
         _factoryContract = address(1);
     }
 
     function initialize(
-        IERC721[] memory nftAddresses_,
+        IERC721 nftAddress_,
         address owner_,
-        uint256[] memory tokenIds_,
-        uint256 totalSupply_,
+        uint256 tokenId_,
         string memory name_,
         string memory symbol_,
-        uint256 buyoutPrice_,
         address factoryContract,
-        address governor_,
-        address timelock_
     ) external {
         require(_factoryContract == address(0), "already initialized");
         require(factoryContract != address(0), "factory can not be null");
 
         _factoryContract = factoryContract;
-        _governor = governor_;
-        _timelock = timelock_;
 
-        for (uint256 i = 0; i < nftAddresses_.length; i++) {
             _raisedNftArray.push(
                 _raisedNftStruct({
-                    nftaddress: nftAddresses_[i],
-                    tokenid: tokenIds_[i],
+                    nftaddress: nftAddress_,
+                    tokenid: tokenId_[i],
                     forSale: false,
                     price: 0
                 })
             );
-
-            _ownedAlready[address(nftAddresses_[i])][tokenIds_[i]] = true;
-            _nftCount++;
-        }
 
         // no difference as to if it's initialized or not, but better than uninitialized
         positionManager = INonfungiblePositionManager(
@@ -191,14 +151,11 @@ contract Alchemy is IERC20 {
         ); //https://github.com/Uniswap/uniswap-v3-periphery/blob/main/deploys.md
 
         // leave false, if this becomes a nonfungible position then set true after
-        isFungibleLiquidityPosition = false;
         permaNonfungiblePositionDisabled = false;
 
         _totalSupply = totalSupply_;
         _name = name_;
         _symbol = symbol_;
-        _buyoutPrice = buyoutPrice_;
-        _balances[owner_] = _totalSupply;
         emit Transfer(address(0), owner_, _totalSupply);
     }
 
@@ -206,8 +163,7 @@ contract Alchemy is IERC20 {
         external
         isNonfungibleLockedForever()
     {
-        // tell that this is a fungible liquidity position
-        isFungibleLiquidityPosition = true;
+ ;
         // for ease of access
         nonfungiblePosition = _raisedNftArray[0];
         // so that the function can't be called
@@ -229,51 +185,6 @@ contract Alchemy is IERC20 {
         _totalSupply = 0;
     }
 
-    function lockForNonfungiblePositionPermanently()
-        external
-        isNonfungibleLockedForever()
-    {
-        permaNonfungiblePositionDisabled = true;
-    }
-
-    /**
-     * @notice modifier only timelock can call these functions
-     */
-    modifier onlyTimeLock() {
-        require(msg.sender == _timelock, "ALC:Only Timelock can call");
-        _;
-    }
-
-    /**
-     * @notice modifier only timelock or buyout address can call these functions
-     */
-    modifier onlyTimeLockOrBuyer() {
-        require(
-            msg.sender == _timelock || msg.sender == _buyoutAddress,
-            "ALC:Only Timelock or Buyer can call"
-        );
-        _;
-    }
-
-    /**
-     * @notice modifier only if buyoutAddress is not initialized
-     */
-    modifier stillToBuy() {
-        require(_buyoutAddress == address(0), "ALC:Already bought out");
-        _;
-    }
-
-    /**
-     * @notice it's a modifier that can be generally applied but let's call it like this for best practice i suppose
-     */
-    modifier FungibleLiquidityPositionCheck() {
-        require(
-            isFungibleLiquidityPosition,
-            "Not a fungible liquidity position"
-        );
-        _;
-    }
-
     /**
      * @notice modifier to determine if nonfungible is locked forevr
      */
@@ -293,149 +204,6 @@ contract Alchemy is IERC20 {
      */
     function _burn(uint256 amount) internal {
         _totalSupply = _totalSupply.sub(amount);
-    }
-
-    /**
-     * @dev After a buyout token holders can burn their tokens and get a proportion of the contract balance as a reward
-     */
-    function burnForETH() external {
-        uint256 balance = balanceOf(msg.sender);
-        _balances[msg.sender] = 0;
-        uint256 contractBalance = address(this).balance;
-        uint256 cashOut = contractBalance.mul(balance).div(_totalSupply);
-        _burn(balance);
-        msg.sender.transfer(cashOut);
-
-        emit BurnedForEth(msg.sender, cashOut);
-        emit Transfer(msg.sender, address(0), balance);
-    }
-
-    /**
-     * @notice Lets any user buy shares if there are shares to be sold
-     *
-     * @param amount the amount to be bought
-     */
-    function buyShares(uint256 amount) external payable {
-        require(_sharesForSale >= amount, "low shares");
-        require(
-            msg.value == amount.mul(_buyoutPrice).div(_totalSupply),
-            "low value"
-        );
-
-        _balances[msg.sender] = _balances[msg.sender].add(amount);
-        _sharesForSale = _sharesForSale.sub(amount);
-
-        emit SharesBought(msg.sender, amount);
-        emit Transfer(address(0), msg.sender, amount);
-    }
-
-    /**
-     * @notice view function to get the discounted buyout price
-     *
-     * @param account the account
-     */
-    function getBuyoutPriceWithDiscount(address account)
-        public
-        view
-        returns (uint256)
-    {
-        uint256 balance = _balances[account];
-        return
-            _buyoutPrice
-                .mul((_totalSupply.sub(balance)).mul(10**18).div(_totalSupply))
-                .div(10**18);
-    }
-
-    /**
-     * @notice Lets anyone buyout the whole dao if they send ETH according to the buyout price
-     * all nfts will be transferred to the buyer
-     * also a fee will be distributed 0.5%
-     */
-    function buyout() external payable stillToBuy {
-        uint256 buyoutPriceWithDiscount =
-            getBuyoutPriceWithDiscount(msg.sender);
-        require(msg.value == buyoutPriceWithDiscount, "buy value not met");
-
-        uint256 balance = _balances[msg.sender];
-        _balances[msg.sender] = 0;
-        _burn(balance);
-
-        // Take 0.5% fee
-        address payable alchemyRouter =
-            IAlchemyFactory(_factoryContract).getAlchemyRouter();
-        IAlchemyRouter(alchemyRouter).deposit{
-            value: buyoutPriceWithDiscount / 200
-        }();
-
-        // set buyer address
-        _buyoutAddress = msg.sender;
-
-        emit Buyout(msg.sender, buyoutPriceWithDiscount);
-        emit Transfer(msg.sender, address(0), balance);
-    }
-
-    /**
-     * @notice transfers specific nfts after the buyout happened
-     *
-     * @param nftids the array of nft ids
-     */
-    function buyoutWithdraw(uint256[] memory nftids) external {
-        require(
-            msg.sender == _buyoutAddress,
-            "can only be called by the buyer"
-        );
-
-        _raisedNftStruct[] memory raisedNftArray = _raisedNftArray;
-
-        for (uint256 i = 0; i < nftids.length; i++) {
-            raisedNftArray[nftids[i]].nftaddress.safeTransferFrom(
-                address(this),
-                msg.sender,
-                raisedNftArray[nftids[i]].tokenid
-            );
-            emit BuyoutTransfer(
-                address(raisedNftArray[nftids[i]].nftaddress),
-                raisedNftArray[nftids[i]].tokenid
-            );
-        }
-    }
-
-    /**
-     * @notice decreases shares for sale on the open market
-     *
-     * @param amount the amount to be burned
-     */
-    function burnSharesForSale(uint256 amount) external onlyTimeLock {
-        require(_sharesForSale >= amount, "Low shares");
-
-        _burn(amount);
-        _sharesForSale = _sharesForSale.sub(amount);
-
-        emit SharesBurned(amount);
-        emit Transfer(msg.sender, address(0), amount);
-    }
-
-    /**
-     * @notice increases shares for sale on the open market
-     *
-     * @param amount the amount to be minted
-     */
-    function mintSharesForSale(uint256 amount) external onlyTimeLock {
-        _totalSupply = _totalSupply.add(amount);
-        _sharesForSale = _sharesForSale.add(amount);
-
-        emit SharesMinted(amount);
-        emit Transfer(address(0), address(this), amount);
-    }
-
-    /**
-     * @notice changes the buyout price for the whole dao
-     *
-     * @param amount to set the new price
-     */
-    function changeBuyoutPrice(uint256 amount) external onlyTimeLock {
-        _buyoutPrice = amount;
-        emit NewBuyoutPrice(amount);
     }
 
     ////////////////////////////////////
@@ -649,166 +417,6 @@ contract Alchemy is IERC20 {
     ////////////////////////////////////
 
     /**
-     * @notice allows the dao to set a specific nft on sale or to close the sale
-     *
-     * @param nftarrayid the nftarray id
-     * @param price the buyout price for the specific nft
-     * @param sale bool indicates the sale status
-     */
-    function setNftSale(
-        uint256 nftarrayid,
-        uint256 price,
-        bool sale
-    ) external onlyTimeLock {
-        _raisedNftArray[nftarrayid].forSale = sale;
-        _raisedNftArray[nftarrayid].price = price;
-
-        emit NftSaleChanged(nftarrayid, price, sale);
-    }
-
-    /**
-     * @notice allows anyone to buy a specific nft if it is on sale
-     * takes a fee of 0.5% on sale
-     * @param nftarrayid the nftarray id
-     */
-    function buySingleNft(uint256 nftarrayid) external payable stillToBuy {
-        _raisedNftStruct memory singleNft = _raisedNftArray[nftarrayid];
-
-        require(singleNft.forSale, "Not for sale");
-        require(msg.value == singleNft.price, "Price too low");
-
-        // Take 0.5% fee
-        address payable alchemyRouter =
-            IAlchemyFactory(_factoryContract).getAlchemyRouter();
-        IAlchemyRouter(alchemyRouter).deposit{value: singleNft.price / 200}();
-
-        _ownedAlready[address(singleNft.nftaddress)][singleNft.tokenid] = false;
-        _nftCount--;
-
-        for (uint256 i = nftarrayid; i < _raisedNftArray.length - 1; i++) {
-            _raisedNftArray[i] = _raisedNftArray[i + 1];
-        }
-        _raisedNftArray.pop();
-
-        singleNft.nftaddress.safeTransferFrom(
-            address(this),
-            msg.sender,
-            singleNft.tokenid
-        );
-
-        emit SingleNftBought(msg.sender, nftarrayid, singleNft.price);
-    }
-
-    /**
-     * @notice adds a new nft to the nft array
-     * must be approved and transferred extra
-     *
-     * @param new_nft the address of the new nft
-     * @param tokenid the if of the nft token
-     */
-    function addNft(address new_nft, uint256 tokenid)
-        public
-        onlyTimeLockOrBuyer
-    {
-        require(
-            _ownedAlready[new_nft][tokenid] == false,
-            "ALC: Cant add duplicate NFT"
-        );
-        _raisedNftStruct memory temp_struct;
-        temp_struct.nftaddress = IERC721(new_nft);
-        temp_struct.tokenid = tokenid;
-        _raisedNftArray.push(temp_struct);
-        _nftCount++;
-
-        _ownedAlready[new_nft][tokenid] = true;
-        emit NftAdded(new_nft, tokenid);
-    }
-
-    /**
-     * @notice transfers an NFT to the DAO contract (called by executeTransaction function)
-     *
-     * @param new_nft the address of the new nft
-     * @param tokenid the if of the nft token
-     */
-    function transferFromAndAdd(address new_nft, uint256 tokenid)
-        public
-        onlyTimeLockOrBuyer
-    {
-        IERC721(new_nft).transferFrom(
-            IERC721(new_nft).ownerOf(tokenid),
-            address(this),
-            tokenid
-        );
-        addNft(new_nft, tokenid);
-
-        emit NftTransferredAndAdded(new_nft, tokenid);
-    }
-
-    /**
-     * @notice adds an NFT collection to the DAO contract
-     *
-     * @param new_nft_array the address of the new nft
-     * @param tokenid_array the id of the nft token
-     */
-    function addNftCollection(
-        address[] memory new_nft_array,
-        uint256[] memory tokenid_array
-    ) public onlyTimeLockOrBuyer {
-        for (uint256 i = 0; i <= new_nft_array.length - 1; i++) {
-            addNft(new_nft_array[i], tokenid_array[i]);
-        }
-    }
-
-    /**
-     * @notice transfers an NFT collection to the DAO contract
-     *
-     * @param new_nft_array the address of the new nft
-     * @param tokenid_array the id of the nft token
-     */
-    function transferFromAndAddCollection(
-        address[] memory new_nft_array,
-        uint256[] memory tokenid_array
-    ) public onlyTimeLockOrBuyer {
-        for (uint256 i = 0; i <= new_nft_array.length - 1; i++) {
-            transferFromAndAdd(new_nft_array[i], tokenid_array[i]);
-        }
-    }
-
-    /**
-     * @notice executes any transaction
-     *
-     * @param target the target of the call
-     * @param value the value of the call
-     * @param signature the signature of the function call
-     * @param data the calldata
-     */
-    function executeTransaction(
-        address target,
-        uint256 value,
-        string memory signature,
-        bytes memory data
-    ) external payable onlyTimeLock returns (bytes memory) {
-        bytes memory callData;
-
-        if (bytes(signature).length == 0) {
-            callData = data;
-        } else {
-            callData = abi.encodePacked(
-                bytes4(keccak256(bytes(signature))),
-                data
-            );
-        }
-
-        // solium-disable-next-line security/no-call-value
-        (bool success, bytes memory returnData) =
-            target.call{value: value}(callData);
-        require(success, "ALC:exec reverted");
-
-        emit TransactionExecuted(target, value, signature, data);
-        return returnData;
-    }
-
-    /**
      * @dev Returns the name of the token.
      */
     function name() public view returns (string memory) {
@@ -972,95 +580,6 @@ contract Alchemy is IERC20 {
         emit Approval(owner, spender, amount);
     }
 
-    function _transfer(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) internal {
-        require(sender != address(0), "ERC20: transfer from 0");
-        require(recipient != address(0), "ERC20: transfer to 0");
-        _balances[sender] = _balances[sender].sub(
-            amount,
-            "ERC20: transfer amount exceeds"
-        );
-        _balances[recipient] = _balances[recipient].add(amount);
-        emit Transfer(sender, recipient, amount);
-    }
-
-    /**
-     * @notice Delegate votes from `msg.sender` to `delegatee`
-     * @param delegatee The address to delegate votes to
-     */
-    function delegate(address delegatee) public {
-        return _delegate(msg.sender, delegatee);
-    }
-
-    /**
-     * @notice Gets the current votes balance for `account`
-     * @param account The address to get votes balance
-     * @return The number of current votes for `account`
-     */
-    function getCurrentVotes(address account) external view returns (uint256) {
-        uint32 nCheckpoints = numCheckpoints[account];
-        return
-            nCheckpoints > 0 ? checkpoints[account][nCheckpoints - 1].votes : 0;
-    }
-
-    /**
-     * @notice Determine the prior number of votes for an account as of a block number
-     * @dev Block number must be a finalized block or else this function will revert to prevent misinformation.
-     * @param account The address of the account to check
-     * @param blockNumber The block number to get the vote balance at
-     * @return The number of votes the account had as of the given block
-     */
-    function getPriorVotes(address account, uint256 blockNumber)
-        public
-        view
-        returns (uint256)
-    {
-        require(blockNumber < block.number, "ALC:getPriorVotes");
-
-        uint32 nCheckpoints = numCheckpoints[account];
-        if (nCheckpoints == 0) {
-            return 0;
-        }
-
-        // First check most recent balance
-        if (checkpoints[account][nCheckpoints - 1].fromBlock <= blockNumber) {
-            return checkpoints[account][nCheckpoints - 1].votes;
-        }
-
-        // Next check implicit zero balance
-        if (checkpoints[account][0].fromBlock > blockNumber) {
-            return 0;
-        }
-
-        uint32 lower = 0;
-        uint32 upper = nCheckpoints - 1;
-        while (upper > lower) {
-            uint32 center = upper - (upper - lower) / 2; // ceil, avoiding overflow
-            Checkpoint memory cp = checkpoints[account][center];
-            if (cp.fromBlock == blockNumber) {
-                return cp.votes;
-            } else if (cp.fromBlock < blockNumber) {
-                lower = center;
-            } else {
-                upper = center - 1;
-            }
-        }
-        return checkpoints[account][lower].votes;
-    }
-
-    function _delegate(address delegator, address delegatee) internal {
-        address currentDelegate = delegates[delegator];
-        uint256 delegatorBalance = _balances[delegator];
-        delegates[delegator] = delegatee;
-
-        emit DelegateChanged(delegator, currentDelegate, delegatee);
-
-        _moveDelegates(currentDelegate, delegatee, delegatorBalance);
-    }
-
     function _transferTokens(
         address src,
         address dst,
@@ -1072,60 +591,6 @@ contract Alchemy is IERC20 {
         _balances[src] = _balances[src].sub(amount, "ALC:_transferTokens");
         _balances[dst] = _balances[dst].add(amount);
         emit Transfer(src, dst, amount);
-
-        _moveDelegates(delegates[src], delegates[dst], amount);
-    }
-
-    function _moveDelegates(
-        address srcRep,
-        address dstRep,
-        uint256 amount
-    ) internal {
-        if (srcRep != dstRep && amount > 0) {
-            if (srcRep != address(0)) {
-                uint32 srcRepNum = numCheckpoints[srcRep];
-                uint256 srcRepOld =
-                    srcRepNum > 0
-                        ? checkpoints[srcRep][srcRepNum - 1].votes
-                        : 0;
-                uint256 srcRepNew = srcRepOld.sub(amount, "ALC:_moveVotes");
-                _writeCheckpoint(srcRep, srcRepNum, srcRepOld, srcRepNew);
-            }
-
-            if (dstRep != address(0)) {
-                uint32 dstRepNum = numCheckpoints[dstRep];
-                uint256 dstRepOld =
-                    dstRepNum > 0
-                        ? checkpoints[dstRep][dstRepNum - 1].votes
-                        : 0;
-                uint256 dstRepNew = dstRepOld.add(amount);
-                _writeCheckpoint(dstRep, dstRepNum, dstRepOld, dstRepNew);
-            }
-        }
-    }
-
-    function _writeCheckpoint(
-        address delegatee,
-        uint32 nCheckpoints,
-        uint256 oldVotes,
-        uint256 newVotes
-    ) internal {
-        uint32 blockNumber = safe32(block.number, "ALC:_writeCheck");
-
-        if (
-            nCheckpoints > 0 &&
-            checkpoints[delegatee][nCheckpoints - 1].fromBlock == blockNumber
-        ) {
-            checkpoints[delegatee][nCheckpoints - 1].votes = newVotes;
-        } else {
-            checkpoints[delegatee][nCheckpoints] = Checkpoint(
-                newVotes,
-                blockNumber
-            );
-            numCheckpoints[delegatee] = nCheckpoints + 1;
-        }
-
-        emit DelegateVotesChanged(delegatee, oldVotes, newVotes);
     }
 
     function safe32(uint256 n, string memory errorMessage)
