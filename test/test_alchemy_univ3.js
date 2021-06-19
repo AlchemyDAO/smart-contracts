@@ -22,6 +22,11 @@ describe("Test Alchemy Functions", function () {
   let mockTokenContract;
   let nonfungiblePositionManagerContract;
 
+  let timeout = new Promise((resolve, reject) => {
+    setTimeout(() => resolve("done!"), 10000)
+  });
+
+
   let owner, addr1, addr2, addr3, addr4;
   // const deploy = async (name, ...args) =>
   //   (await ethers.getContractFactory(name)).deploy(...args);
@@ -32,18 +37,16 @@ describe("Test Alchemy Functions", function () {
     await CloneTestContract.deployed();
   });
 
-
-    let overrides = {
-      gasLimit: ethers.utils.parseUnits("7800000", "wei"),
-      gasPrice: ethers.utils.parseUnits("20", "gwei")
-    };
+  let overrides = {
+    gasLimit: ethers.utils.parseUnits("7800000", "wei"),
+    gasPrice: ethers.utils.parseUnits("30", "gwei"),
+  };
 
   // initial deployment of Conjure Factory
   before(async function () {
     [owner, addr1, addr2, addr3, addr4] = await ethers.getSigners();
 
     console.log(owner.address);
-
 
     let governorAlphaFactory = await ethers.getContractFactory("GovernorAlpha");
     let alchemyFactoryF = await ethers.getContractFactory("Alchemy");
@@ -132,10 +135,9 @@ describe("Test Alchemy Functions", function () {
     });
   });
 
-
-
   it("Set up staking distribution", async function () {
-    await stakingRewards.setRewardsDistribution(alchemyRouter.address), overrides;
+    await stakingRewards.setRewardsDistribution(alchemyRouter.address),
+      overrides;
   });
 
   it("Set up factory owner", async function () {
@@ -144,10 +146,13 @@ describe("Test Alchemy Functions", function () {
   });
 
   it("Enter staking pool", async function () {
-    await alc.approve(stakingRewards.address, "50000000000000000000", overrides);
+    await alc.approve(
+      stakingRewards.address,
+      "50000000000000000000",
+      overrides
+    );
     await stakingRewards.stake("50000000000000000000", overrides);
   });
-
 
   describe("NFTDaoMint()", async () => {
     it("Should deploy the pool", async () => {
@@ -184,13 +189,13 @@ describe("Test Alchemy Functions", function () {
     it("Should deploy alchemy contract", async () => {
       const txmtx = await mockTokenContract.transferNFT(overrides);
 
-      var { events , cumulativeGasUsed, gasUsed} = await txmtx.wait();
+      var { events, cumulativeGasUsed, gasUsed } = await txmtx.wait();
 
-      let argumentTokenId = events.find(({event}) => event == 'NFTTOKENID').args;
-
+      let argumentTokenId = events.find(
+        ({ event }) => event == "NFTTOKENID"
+      ).args;
 
       let tokenIdInput = argumentTokenId[0].toNumber();
-
 
       await nonfungiblePositionManagerContract.approve(
         alchemyFactory.address,
@@ -202,7 +207,7 @@ describe("Test Alchemy Functions", function () {
         ["0xc36442b4a4522e871399cd717abdd847ab11fe88"], // is constant on all networks
         owner.address,
         [argumentTokenId[0].toNumber()],
-        1,
+        0,
         "Uniswap V3 Positions NFT V1",
         "UNI-V3-POS",
         "10",
@@ -211,7 +216,7 @@ describe("Test Alchemy Functions", function () {
         overrides
       );
 
-      var {events, cumulativeGasUsed, gasUsed}  = await tx.wait();
+      var { events, cumulativeGasUsed, gasUsed } = await tx.wait();
 
       console.log(`Cumulative: ${cumulativeGasUsed.toNumber()}`);
       console.log(`Gas: ${gasUsed.toNumber()}`);
@@ -236,7 +241,7 @@ describe("Test Alchemy Functions", function () {
     it("Governor should have correct params", async () => {
       expect(await governor.nft()).to.eq(alchemy.address);
       expect(await governor.timelock()).to.eq(timelock.address);
-      expect(await governor.totalSupply()).to.eq(1);
+      expect(await governor.totalSupply()).to.eq(0);
       expect(await governor.votingPeriod()).to.eq(1);
     });
 
@@ -249,24 +254,32 @@ describe("Test Alchemy Functions", function () {
       await alchemy.delegate(owner.address);
     });
 
-    it("should approve weth9", async function() {
-
-     await expect(await WETH9Contract.approve(
-        alchemy.address,
-        ethers.utils.parseEther("1"),
-        overrides
-      )).to.emit(WETH9Contract, 'Approval').withArgs(owner.address, alchemy.address, ethers.utils.parseEther("1"));
-
+    it("should approve weth9", async function () {
+      await expect(
+        await WETH9Contract.approve(
+          alchemy.address,
+          ethers.utils.parseEther("1"),
+          overrides
+        )
+      )
+        .to.emit(WETH9Contract, "Approval")
+        .withArgs(owner.address, alchemy.address, ethers.utils.parseEther("1"));
     });
 
-    it("should approve mockToken", async function() {
-
-      await expect(await mockTokenContract.approve(
-        alchemy.address,
-        ethers.utils.parseEther("10"),
-        overrides
-      )).to.emit(mockTokenContract, 'Approval').withArgs(owner.address, alchemy.address, ethers.utils.parseEther("10"));
-
+    it("should approve mockToken", async function () {
+      await expect(
+        await mockTokenContract.approve(
+          alchemy.address,
+          ethers.utils.parseEther("10"),
+          overrides
+        )
+      )
+        .to.emit(mockTokenContract, "Approval")
+        .withArgs(
+          owner.address,
+          alchemy.address,
+          ethers.utils.parseEther("10")
+        );
     });
 
     // test univ3
@@ -280,6 +293,160 @@ describe("Test Alchemy Functions", function () {
       );
     });
 
+    it("Should be possible to make a proposal to increase shares for sale", async function () {
+      const goveroraddress = await alchemy._governor(overrides);
+      const govcontract = await ethers.getContractAt(
+        "GovernorAlpha",
+        goveroraddress
+      );
 
+      let parameters = encoder.encode(["uint256"], ["1000000000000000000"]);
+
+      await expect(governor.propose(
+        [alchemy.address],
+        [0],
+        ["mintSharesForSale(uint256)"],
+        [parameters],
+        "Test proposal to increase shares for sale",
+        overrides
+      )).to.not.be.reverted;
+
+      await timeout;
+
+      await expect(governor.castVote(1, true,overrides)).to.not.be.reverted;
+
+      await timeout;
+      await timeout;
+
+      await expect(governor.queue(1,overrides)).to.not.be.reverted;
+
+      await timeout;
+
+      let shares = await alchemy._sharesForSale(overrides);
+      expect(shares).to.be.equal(0);
+
+      let totalsupp = await alchemy.totalSupply(overrides);
+
+      await timeout;
+
+      await governor.execute(1,overrides);
+
+      await timeout;
+
+      let totalsuppnew = await alchemy.totalSupply(overrides);
+      shares = await alchemy._sharesForSale(overrides);
+      expect(shares).to.be.equal("1000000000000000000");
+
+      expect(BigNumber.from(totalsupp).add(shares)).to.be.equal(totalsuppnew);
+    });
+
+    it("Should be possible to make a proposal to increase buyout price", async function () {
+
+      const goveroraddress = await alchemy._governor(overrides);
+
+      const govcontract = await ethers.getContractAt(
+        "GovernorAlpha",
+        goveroraddress
+      );
+
+      let parameters = encoder.encode(["uint256"], ["5000000000000000000"]);
+
+      await govcontract.propose(
+        [alchemy.address],
+        [0],
+        ["changeBuyoutPrice(uint256)"],
+        [parameters],
+        "Test proposal to increase buyout price",
+        overrides
+      );
+
+      await govcontract.castVote(2, true, overrides);
+
+      await govcontract.queue(2,overrides);
+
+      let shares = await alchemy._buyoutPrice(overrides);
+      expect(shares).to.be.equal("1");
+
+      await govcontract.execute(2,overrides);
+
+      shares = await alchemy._buyoutPrice(overrides);
+      expect(shares).to.be.equal("5000000000000000000");
+    });
+
+    it("Should be possible to buy shares for sale", async function () {
+      let totalsupply = await alchemy.totalSupply(overrides);
+      let buyout = await alchemy._buyoutPrice(overrides);
+
+      let valuer = BigNumber.from("500000000000000000")
+        .mul(buyout)
+        .div(totalsupply);
+
+      let overrides = {
+        value: valuer,
+        gasLimit: ethers.utils.parseUnits("7800000", "wei"),
+        gasPrice: ethers.utils.parseUnits("20", "gwei"),
+      };
+
+      console.log(valuer);
+
+      let shares = await alchemy._sharesForSale(overrides);
+      expect(shares).to.be.equal("1000000000000000000");
+
+      await alchemy.buyShares("500000000000000000", overrides);
+
+      shares = await alchemy._sharesForSale({ gasLimit: ethers.utils.parseUnits("7800000", "wei"), gasPrice: ethers.utils.parseUnits("20", "gwei")});
+      expect(shares).to.be.equal("500000000000000000");
+    });
+
+    it("Should be possible to make a proposal to burn shares for sale", async function () {
+      const goveroraddress = await alchemy._governor(overrides);
+      const govcontract = await ethers.getContractAt(
+        "GovernorAlpha",
+        goveroraddress
+      );
+
+      let parameters = encoder.encode(["uint256"], ["200000000000000000"]);
+
+      await govcontract.propose(
+        [alchemy.address],
+        [0],
+        ["burnSharesForSale(uint256)"],
+        [parameters],
+        "Test proposal to burn shares for sale",
+        overrides
+      );
+
+
+      await govcontract.castVote(5, true, overrides);
+
+      await govcontract.queue(5, overrides);
+
+      await govcontract.execute(5, overrides);
+
+      let shares = await alchemy._sharesForSale(overrides);
+      expect(shares).to.be.equal("300000000000000000");
+    });
+
+    it("Should be possible to buyout", async function () {
+      let overrides = {
+        value: "5000000000000000000",
+        gasLimit: ethers.utils.parseUnits("7800000", "wei"),
+        gasPrice: ethers.utils.parseUnits("20", "gwei"),
+      };
+
+      console.log(await alchemy._nftCount({ gasLimit: ethers.utils.parseUnits("7800000", "wei"), gasPrice: ethers.utils.parseUnits("20", "gwei")}));
+
+      await alchemy.connect(addr1).buyout(overrides);
+
+      expect(await alchemy._buyoutAddress({ gasLimit: ethers.utils.parseUnits("7800000", "wei"), gasPrice: ethers.utils.parseUnits("20", "gwei")})).to.be.equal(addr1.address);
+    });
+
+    it("Should be possible to burnForETH", async function () {
+      await alchemy.burnForETH({ gasLimit: ethers.utils.parseUnits("7800000", "wei"), gasPrice: ethers.utils.parseUnits("20", "gwei")});
+    });
+
+    it("Should not be possible to call a function for TL directly", async function () {
+      await expect(alchemy.mintSharesForSale(2,{ gasLimit: ethers.utils.parseUnits("7800000", "wei"), gasPrice: ethers.utils.parseUnits("20", "gwei")})).to.be.reverted;
+    });
   });
 });

@@ -354,8 +354,6 @@ describe("Test Alchemy Functions", function () {
 
           await alchemy.buyShares("500000000000000000", overrides)
 
-
-
           shares = await alchemy._sharesForSale()
           expect (shares).to.be.equal("500000000000000000")
       });

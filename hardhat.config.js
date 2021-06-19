@@ -30,6 +30,10 @@ module.exports = {
     ropsten: {
       url: process.env.ropstenInfura,
       accounts: [process.env.ropstenWalletPK]
+    },
+    rinkeby: {
+      url: process.env.rinkebyInfura,
+      accounts: [process.env.rinkebyWalletPK]
     }
   },
 
