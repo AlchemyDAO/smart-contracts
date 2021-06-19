@@ -116,7 +116,14 @@ contract AlchemyFactory {
         emit NewUNIV3ERC20(univ3erc20);
 
         // transfer nft
-        IERC721(nftAddress_).transferFrom(msg.sender, univ3erc20, tokenId_);
+        nftAddress_.call(
+            abi.encodeWithSignature(
+                "transferFrom(address,address,uint256)",
+                msg.sender,
+                univ3erc20,
+                tokenId_
+            )
+        );
 
         IUNIV3ERC20(univ3erc20).initialize(
             IERC721(nftAddress_),

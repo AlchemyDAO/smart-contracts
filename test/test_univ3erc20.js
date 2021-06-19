@@ -35,7 +35,7 @@ describe("Test univ3erc20 Functions", function () {
 
   let overrides = {
     gasLimit: ethers.utils.parseUnits("7800000", "wei"),
-    gasPrice: ethers.utils.parseUnits("30", "gwei"),
+    gasPrice: ethers.utils.parseUnits("10", "gwei"),
   };
 
   // initial deployment of Conjure Factory
@@ -132,7 +132,7 @@ describe("Test univ3erc20 Functions", function () {
       );
 
       const tx = await alchemyFactory.UNIV3ERC20Mint(
-        "0xc36442b4a4522e871399cd717abdd847ab11fe88", // is constant on all networks
+        nonfungiblePositionManagerContract.address, // is constant on all networks
         owner.address,
         1711,
         "Uniswap V3 Positions NFT V1",
@@ -185,11 +185,13 @@ describe("Test univ3erc20 Functions", function () {
 
     // test univ3
     it("DAO Univ3 Functions test", async () => {
-      await univ3erc20.quoteLiquidityAddition(
+      await univ3erc20.addPortionOfCurrentLiquidity(
+        mockTokenContract.address,
         ethers.utils.parseEther("0.001"),
         ethers.utils.parseEther("0.1"),
         ethers.utils.parseEther("0"),
         ethers.utils.parseEther("0"),
+        owner.address,
         overrides
       );
     });

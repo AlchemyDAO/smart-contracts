@@ -155,6 +155,7 @@ contract UNIV3ERC20 is IERC20 {
      * @param amount1MinToSpend min token1 to try and spend
      * */
     function addPortionOfCurrentLiquidity(
+        address tokenZero,
         uint256 amount0ToTrySpend,
         uint256 amount1ToTrySpend,
         uint256 amount0MinToSpend,
@@ -177,7 +178,7 @@ contract UNIV3ERC20 is IERC20 {
 
         ) = positionManager.positions(nonfungiblePosition.tokenid);
 
-        if (!(tokenPool.token1() == address(this))) {
+        if (!(token0 == tokenZero)) {
             (
                 amount0ToTrySpend,
                 amount1ToTrySpend,
@@ -324,6 +325,7 @@ contract UNIV3ERC20 is IERC20 {
     }
 
     function quoteLiquidityAddition(
+        address token0,
         uint256 amount0ToTrySpend,
         uint256 amount1ToTrySpend,
         uint256 amount0MinToSpend,
@@ -331,6 +333,7 @@ contract UNIV3ERC20 is IERC20 {
     ) public returns (uint256) {
         try
             this.addPortionOfCurrentLiquidity(
+                token0,
                 amount0ToTrySpend,
                 amount1ToTrySpend,
                 amount0MinToSpend,
