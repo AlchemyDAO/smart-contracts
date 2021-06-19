@@ -134,7 +134,7 @@ describe("Test univ3erc20 Functions", function () {
       const tx = await alchemyFactory.UNIV3ERC20Mint(
         "0xc36442b4a4522e871399cd717abdd847ab11fe88", // is constant on all networks
         owner.address,
-        tokenIdInput,
+        1711,
         "Uniswap V3 Positions NFT V1",
         "UNI-V3-POS",
         alchemyFactory.address,
@@ -147,7 +147,6 @@ describe("Test univ3erc20 Functions", function () {
       console.log(`Gas: ${gasUsed.toNumber()}`);
       const [event] = events.filter((e) => e.event === "NewUNIV3ERC20");
       univ3erc20 = await ethers.getContractAt("UNIV3ERC20", event.args.univ3erc20);
-      await univ3erc20.initializeNonfungiblePosition();
 
     });
 

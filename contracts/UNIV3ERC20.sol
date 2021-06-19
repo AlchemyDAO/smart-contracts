@@ -58,9 +58,6 @@ contract UNIV3ERC20 is IERC20 {
         uint256 price;
     }
 
-    // array for raised nfts
-    _raisedNftStruct[] public _raisedNftArray;
-
     // univ3 NFT for ease of access
     _raisedNftStruct public nonfungiblePosition;
 
@@ -92,14 +89,12 @@ contract UNIV3ERC20 is IERC20 {
         require(factoryContract != address(0), "factory can not be null");
         _factoryContract = factoryContract;
 
-            _raisedNftArray.push(
-                _raisedNftStruct({
-                    nftaddress: IERC721(nftAddress_),
-                    tokenid: tokenId_,
-                    forSale: false,
-                    price: 0
-                })
-            );
+        nonfungiblePosition = _raisedNftStruct({
+            nftaddress: IERC721(nftAddress_),
+            tokenid: tokenId_,
+            forSale: false,
+            price: 0
+        });
 
         // no difference as to if it's initialized or not, but better than uninitialized
         positionManager = INonfungiblePositionManager(
@@ -113,26 +108,12 @@ contract UNIV3ERC20 is IERC20 {
         _symbol = symbol_;
 
         (, , , , , , , uint128 currentLiquidity, , , , ) =
-            positionManager.positions(nonfungiblePosition.tokenid);
+            positionManager.positions(tokenId_);
 
         _mint(owner_, currentLiquidity);
 
-        emit Transfer(address(0), owner_, _totalSupply);
-    }
-
-    function initializeNonfungiblePosition()
-        external
-        isNonfungibleLockedForever()
-    {
-        // for ease of access
-        nonfungiblePosition = _raisedNftArray[0];
-        // so that the function can't be called
-        permaNonfungiblePositionDisabled = true;
-
-        // immediately initialize tokenPool since it will be necessary for certain calculations
-
         (, , address token0, address token1, uint24 fee, , , , , , , ) =
-            positionManager.positions(nonfungiblePosition.tokenid);
+            positionManager.positions(tokenId_);
 
         tokenPool = IUniswapV3Pool(
             PoolAddress.computeAddress(
@@ -141,19 +122,9 @@ contract UNIV3ERC20 is IERC20 {
             )
         );
 
-        // reset supply to 0
-        _totalSupply = 0;
-    }
+        permaNonfungiblePositionDisabled = true;
 
-    /**
-     * @notice modifier to determine if nonfungible is locked forevr
-     */
-    modifier isNonfungibleLockedForever() {
-        require(
-            !permaNonfungiblePositionDisabled,
-            "this DAO is locked forever and cannot become a nonfungible position"
-        );
-        _;
+        emit Transfer(address(0), owner_, _totalSupply);
     }
 
     /**
