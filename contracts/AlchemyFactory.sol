@@ -103,7 +103,7 @@ contract AlchemyFactory {
     event NewUNIV3ERC20(address univ3erc20);
 
     function UNIV3ERC20Mint(
-        IERC721 nftAddress_,
+        address nftAddress_,
         address owner_,
         uint256 tokenId_,
         string memory name_,
@@ -116,10 +116,10 @@ contract AlchemyFactory {
         emit NewUNIV3ERC20(univ3erc20);
 
         // transfer nft
-        nftAddress_.transferFrom(msg.sender, univ3erc20, tokenId_);
+        IERC721(nftAddress_).transferFrom(msg.sender, univ3erc20, tokenId_);
 
         IUNIV3ERC20(univ3erc20).initialize(
-            nftAddress_,
+            IERC721(nftAddress_),
             owner_,
             tokenId_,
             name_,

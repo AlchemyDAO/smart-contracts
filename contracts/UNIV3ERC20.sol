@@ -81,7 +81,7 @@ contract UNIV3ERC20 is IERC20 {
     }
 
     function initialize(
-        IERC721 nftAddress_,
+        address nftAddress_,
         address owner_,
         uint256 tokenId_,
         string memory name_,
@@ -94,7 +94,7 @@ contract UNIV3ERC20 is IERC20 {
 
             _raisedNftArray.push(
                 _raisedNftStruct({
-                    nftaddress: nftAddress_,
+                    nftaddress: IERC721(nftAddress_),
                     tokenid: tokenId_,
                     forSale: false,
                     price: 0

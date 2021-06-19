@@ -123,6 +123,8 @@ describe("Test univ3erc20 Functions", function () {
 
       let tokenIdInput = argumentTokenId[0].toNumber();
 
+      console.log("TOKEN ID INPUT: ", tokenIdInput, "\n");
+
       await nonfungiblePositionManagerContract.approve(
         alchemyFactory.address,
         tokenIdInput,
@@ -130,9 +132,9 @@ describe("Test univ3erc20 Functions", function () {
       );
 
       const tx = await alchemyFactory.UNIV3ERC20Mint(
-        ["0xc36442b4a4522e871399cd717abdd847ab11fe88"], // is constant on all networks
+        "0xc36442b4a4522e871399cd717abdd847ab11fe88", // is constant on all networks
         owner.address,
-        [argumentTokenId[0].toNumber()],
+        tokenIdInput,
         "Uniswap V3 Positions NFT V1",
         "UNI-V3-POS",
         alchemyFactory.address,
