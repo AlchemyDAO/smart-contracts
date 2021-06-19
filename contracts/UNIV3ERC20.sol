@@ -22,9 +22,9 @@ import {
 import {FullMath} from "@uniswap/v3-core/contracts/libraries/FullMath.sol";
 
 /// @author Alchemy Team
-/// @title Alchemy
-/// @notice The Alchemy contract wraps nfts into erc20
-contract Alchemy is IERC20 {
+/// @title UNIV3ERC20
+/// @notice The contract wraps a univ3 position into a fungible position
+contract UNIV3ERC20 is IERC20 {
     // using Openzeppelin contracts for SafeMath and Address, TransferHelper from the (uni?) library
     using SafeMath for uint256;
     using Address for address;
@@ -50,9 +50,6 @@ contract Alchemy is IERC20 {
     // a record of allowances for a specific address by address to address mapping
     mapping(address => mapping(address => uint256)) private _allowances;
 
-    // presenting the shares for sale
-    uint256 public _sharesForSale;
-
     // struct for raised nfts
     struct _raisedNftStruct {
         IERC721 nftaddress;
@@ -61,62 +58,22 @@ contract Alchemy is IERC20 {
         uint256 price;
     }
 
-    // The total number of NfTs in the DAO
-    uint256 public _nftCount;
-
     // array for raised nfts
     _raisedNftStruct[] public _raisedNftArray;
 
     // univ3 NFT for ease of access
     _raisedNftStruct public nonfungiblePosition;
 
-    // mapping to store the already owned nfts
-    mapping(address => mapping(uint256 => bool)) public _ownedAlready;
-
-    // the buyout price. once its met, all nfts will be transferred to the buyer
-    uint256 public _buyoutPrice;
-
-    // the address which has bought the dao
-    address public _buyoutAddress;
-
-    // representing the governance contract of the nft
-    address public _governor;
-
-    // representing the timelock address of the nft for the governor
-    address public _timelock;
-
-    // factory contract address
-    address public _factoryContract;
-
-    // boolean representing if univ3 NFT contract
-    bool public isFungibleLiquidityPosition;
-
     // bool representing if contract has been locked forever and cannot become a univ3 position
     bool public permaNonfungiblePositionDisabled;
-
-    // A record of each accounts delegate
-    mapping(address => address) public delegates;
-
-    // A checkpoint for marking number of votes from a given block
-    struct Checkpoint {
-        uint256 votes;
-        uint32 fromBlock;
-    }
-
-    // A record of votes checkpoints for each account, by index
-    mapping(address => mapping(uint32 => Checkpoint)) public checkpoints;
-
-    // The number of checkpoints for each account
-    mapping(address => uint32) public numCheckpoints;
-
-    // A record of states for signing / validating signatures
-    mapping(address => uint256) public nonces;
 
     // PositionManager that operates upon NFT's
     INonfungiblePositionManager public positionManager;
 
     // in case we have the above we also take the token pool immediately
     IUniswapV3Pool public tokenPool;
+
+    address public _factoryContract;
 
     constructor() {
         // Don't allow implementation to be initialized.
@@ -129,17 +86,16 @@ contract Alchemy is IERC20 {
         uint256 tokenId_,
         string memory name_,
         string memory symbol_,
-        address factoryContract,
+        address factoryContract
     ) external {
         require(_factoryContract == address(0), "already initialized");
         require(factoryContract != address(0), "factory can not be null");
-
         _factoryContract = factoryContract;
 
             _raisedNftArray.push(
                 _raisedNftStruct({
                     nftaddress: nftAddress_,
-                    tokenid: tokenId_[i],
+                    tokenid: tokenId_,
                     forSale: false,
                     price: 0
                 })
@@ -153,9 +109,14 @@ contract Alchemy is IERC20 {
         // leave false, if this becomes a nonfungible position then set true after
         permaNonfungiblePositionDisabled = false;
 
-        _totalSupply = totalSupply_;
         _name = name_;
         _symbol = symbol_;
+
+        (, , , , , , , uint128 currentLiquidity, , , , ) =
+            positionManager.positions(nonfungiblePosition.tokenid);
+
+        _mint(owner_, currentLiquidity);
+
         emit Transfer(address(0), owner_, _totalSupply);
     }
 
@@ -163,7 +124,6 @@ contract Alchemy is IERC20 {
         external
         isNonfungibleLockedForever()
     {
- ;
         // for ease of access
         nonfungiblePosition = _raisedNftArray[0];
         // so that the function can't be called
@@ -216,9 +176,6 @@ contract Alchemy is IERC20 {
         uint256 amount1Added
     );
 
-    event supplynews(uint256);
-
-
     /**
      * @notice adds liquidity and mints shares based on added liquidity
      * @param amount0ToTrySpend max token0 to try and spend
@@ -232,7 +189,7 @@ contract Alchemy is IERC20 {
         uint256 amount0MinToSpend,
         uint256 amount1MinToSpend,
         address recipient
-    ) external FungibleLiquidityPositionCheck() {
+    ) external {
         // get old liquidity
         (
             ,
@@ -321,7 +278,7 @@ contract Alchemy is IERC20 {
         uint256 minimumToken0Out,
         uint256 minimumToken1Out,
         address recipient_
-    ) external FungibleLiquidityPositionCheck() {
+    ) external {
         // immediately burn tokens
         uint256 balance = balanceOf(recipient_);
         require(balance >= burnerShares, "Can't burn more than you have");
@@ -609,12 +566,4 @@ contract Alchemy is IERC20 {
         }
         return chainId;
     }
-}
-
-interface IAlchemyFactory {
-    function getAlchemyRouter() external view returns (address payable);
-}
-
-interface IAlchemyRouter {
-    function deposit() external payable;
 }
