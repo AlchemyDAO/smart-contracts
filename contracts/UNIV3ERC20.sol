@@ -61,15 +61,13 @@ contract UNIV3ERC20 is IERC20 {
     // univ3 NFT for ease of access
     _raisedNftStruct public nonfungiblePosition;
 
-    // bool representing if contract has been locked forever and cannot become a univ3 position
-    bool public permaNonfungiblePositionDisabled;
-
     // PositionManager that operates upon NFT's
     INonfungiblePositionManager public positionManager;
 
     // in case we have the above we also take the token pool immediately
     IUniswapV3Pool public tokenPool;
 
+    // factory contract that spawned this contract
     address public _factoryContract;
 
     constructor() {
@@ -85,10 +83,12 @@ contract UNIV3ERC20 is IERC20 {
         string memory symbol_,
         address factoryContract
     ) external {
+        // handle initialization
         require(_factoryContract == address(0), "already initialized");
         require(factoryContract != address(0), "factory can not be null");
         _factoryContract = factoryContract;
 
+        // initialize the single nonfungible position
         nonfungiblePosition = _raisedNftStruct({
             nftaddress: IERC721(nftAddress_),
             tokenid: tokenId_,
@@ -96,25 +96,36 @@ contract UNIV3ERC20 is IERC20 {
             price: 0
         });
 
-        // no difference as to if it's initialized or not, but better than uninitialized
+        // initalize the NFPM
         positionManager = INonfungiblePositionManager(
             0xC36442b4a4522E871399CD717aBDD847Ab11FE88
         ); //https://github.com/Uniswap/uniswap-v3-periphery/blob/main/deploys.md
 
-        // leave false, if this becomes a nonfungible position then set true after
-        permaNonfungiblePositionDisabled = false;
-
         _name = name_;
         _symbol = symbol_;
 
-        (, , , , , , , uint128 currentLiquidity, , , , ) =
-            positionManager.positions(tokenId_);
 
+        // data taken from tuple we need for init / minting
+
+        (
+            ,
+            ,
+            address token0,
+            address token1,
+            uint24 fee,
+            ,
+            ,
+            uint128 currentLiquidity,
+            ,
+            ,
+            ,
+
+        ) = positionManager.positions(tokenId_);
+
+        // mint the owner of the NFT exactly as many shares as there is liquidity
         _mint(owner_, currentLiquidity);
 
-        (, , address token0, address token1, uint24 fee, , , , , , , ) =
-            positionManager.positions(tokenId_);
-
+        // init pool obj so we can use it for data
         tokenPool = IUniswapV3Pool(
             PoolAddress.computeAddress(
                 0x1F98431c8aD98523631AE4a59f267346ea31F984,
@@ -122,8 +133,7 @@ contract UNIV3ERC20 is IERC20 {
             )
         );
 
-        permaNonfungiblePositionDisabled = true;
-
+        // print total supply so we see it increasing with mint
         emit Transfer(address(0), owner_, _totalSupply);
     }
 
@@ -154,45 +164,36 @@ contract UNIV3ERC20 is IERC20 {
      * @param amount0MinToSpend min token0 to try and spend
      * @param amount1MinToSpend min token1 to try and spend
      * */
-    function addPortionOfCurrentLiquidity(
-        address tokenZero,
+    function _addPortionOfCurrentLiquidity(
         uint256 amount0ToTrySpend,
         uint256 amount1ToTrySpend,
         uint256 amount0MinToSpend,
         uint256 amount1MinToSpend,
         address recipient
     ) external {
-        // get old liquidity
-        (
-            ,
-            ,
-            address token0,
-            address token1,
-            ,
-            ,
-            ,
-            uint128 currentLiquidity,
-            ,
-            ,
-            ,
 
-        ) = positionManager.positions(nonfungiblePosition.tokenid);
+        (, , address token0, address token1, , , , , , , , ) =
+            positionManager.positions(nonfungiblePosition.tokenid);
 
-        if (!(token0 == tokenZero)) {
-            (
-                amount0ToTrySpend,
-                amount1ToTrySpend,
-                amount0MinToSpend,
-                amount1MinToSpend
-            ) = (
-                amount1ToTrySpend,
-                amount0ToTrySpend,
-                amount1MinToSpend,
-                amount0MinToSpend
-            );
-        }
+        // include a block like this if you want to shift the logic of checking for token (because token assignment is according
+        // to size of address so really undecidable by you) to solidity, just that this is inefficient gas-wise
+        //  if (!(some condition)) { 
+        //      (
+        //          amount0ToTrySpend,
+        //          amount1ToTrySpend,
+        //          amount0MinToSpend,
+        //          amount1MinToSpend
+        //      ) = (
+        //          amount1ToTrySpend,
+        //          amount0ToTrySpend,
+        //          amount1MinToSpend,
+        //          amount0MinToSpend
+        //      );
+        //  }
 
         // transfer from liquidity provider to this contract
+        // be careful not to mess up tokens!!!!
+        // will obviously fail if token spender does not have enough tokens
         token0.safeTransferFrom(recipient, address(this), amount0ToTrySpend);
         token1.safeTransferFrom(recipient, address(this), amount1ToTrySpend);
 
@@ -203,6 +204,7 @@ contract UNIV3ERC20 is IERC20 {
                 amount0ToTrySpend
             )
         );
+
         token1.call(
             abi.encodeWithSignature(
                 "approve(address,uint256)",
@@ -210,6 +212,8 @@ contract UNIV3ERC20 is IERC20 {
                 amount1ToTrySpend
             )
         );
+
+        // amount0 and amount1 actually added
 
         (uint128 newLiquidity, uint256 amount0, uint256 amount1) =
             positionManager.increaseLiquidity(
@@ -223,6 +227,7 @@ contract UNIV3ERC20 is IERC20 {
                 })
             );
 
+        // new liquidity is instantly the delta so we can easily just mint according to it
         _mint(msg.sender, newLiquidity);
 
         // transfer back to sender unspent rest
@@ -245,29 +250,24 @@ contract UNIV3ERC20 is IERC20 {
      * @param minimumToken0Out min amount of token 0 you want back
      * @param minimumToken1Out min amount of token 0 you want back
      * */
-    function withdrawPortionOfCurrentLiquidity(
+    function _withdrawPortionOfCurrentLiquidity(
         uint128 burnerShares,
         uint256 minimumToken0Out,
         uint256 minimumToken1Out,
         address recipient_
     ) external {
-        // immediately burn tokens
+
         uint256 balance = balanceOf(recipient_);
         require(balance >= burnerShares, "Can't burn more than you have");
 
-        if (!(tokenPool.token1() == address(this))) {
-            (minimumToken0Out, minimumToken1Out) = (
-                minimumToken1Out,
-                minimumToken0Out
-            );
-        }
-
+        // immediately burn tokens
         _balances[recipient_] = balance.sub(burnerShares);
         _burn(burnerShares);
 
         (, , , , , , , uint128 currentLiquidity, , , , ) =
             positionManager.positions(nonfungiblePosition.tokenid);
 
+        // new lower liquidity
         uint128 newLiquidity = uint128(currentLiquidity.sub(burnerShares));
 
         //  Decrease liquidity, tokens are accounted to position.
@@ -309,8 +309,12 @@ contract UNIV3ERC20 is IERC20 {
         return tokenPool.token1();
     }
 
+    function getTotalShares() external view returns (uint128) {
+        return tokenPool.liquidity();
+    }
+
     function parseRevertReason(bytes memory reason)
-        external
+        internal
         pure
         returns (uint256)
     {
@@ -325,15 +329,13 @@ contract UNIV3ERC20 is IERC20 {
     }
 
     function quoteLiquidityAddition(
-        address token0,
         uint256 amount0ToTrySpend,
         uint256 amount1ToTrySpend,
         uint256 amount0MinToSpend,
         uint256 amount1MinToSpend
-    ) public returns (uint256) {
+    ) external returns (uint256) {
         try
-            this.addPortionOfCurrentLiquidity(
-                token0,
+            this._addPortionOfCurrentLiquidity(
                 amount0ToTrySpend,
                 amount1ToTrySpend,
                 amount0MinToSpend,
@@ -341,7 +343,24 @@ contract UNIV3ERC20 is IERC20 {
                 msg.sender
             )
         {} catch (bytes memory reason) {
-            return this.parseRevertReason(reason);
+            return parseRevertReason(reason);
+        }
+    }
+
+    function quoteLiquidityWithdrawal(
+        uint128 burnerShares,
+        uint256 minimumToken0Out,
+        uint256 minimumToken1Out
+    ) external returns (uint256) {
+        try
+            this._withdrawPortionOfCurrentLiquidity(
+                burnerShares,
+                minimumToken0Out,
+                minimumToken1Out,
+                msg.sender
+            )
+        {} catch (bytes memory reason) {
+            return parseRevertReason(reason);
         }
     }
 

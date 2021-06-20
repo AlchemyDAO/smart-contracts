@@ -183,6 +183,14 @@ contract MockToken is ERC20 {
         return liq;
     }
 
+    event TokenAddresses(address token0, address token1);
+
+    function returnTokenAddresses() external returns (address token0, address token1) {
+        (token0, token1) = (deployedPool.token0(), deployedPool.token1());
+        emit TokenAddresses(token0,token1);
+        return (token0, token1);
+    }
+
     event Fees(uint128, uint128);
 
     function returnFeesOfPool()

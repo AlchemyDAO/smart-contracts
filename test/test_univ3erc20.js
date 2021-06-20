@@ -11,17 +11,10 @@ const encoder = defaultAbiCoder;
 
 // test suite for Alchemy
 describe("Test univ3erc20 Functions", function () {
-
-  // variable to store the deployed smart contract
-  let alchemyImplementation;
+  // factories / contracts
   let alchemyFactory;
   let mockTokenContract;
   let nonfungiblePositionManagerContract;
-
-  let timeout = new Promise((resolve, reject) => {
-    setTimeout(() => resolve("done!"), 10000)
-  });
-
 
   let owner, addr1, addr2, addr3, addr4;
   // const deploy = async (name, ...args) =>
@@ -33,6 +26,7 @@ describe("Test univ3erc20 Functions", function () {
     await CloneTestContract.deployed();
   });
 
+  // due to testnet, we have to specify gas limit, this is almost max on ropsten
   let overrides = {
     gasLimit: ethers.utils.parseUnits("7800000", "wei"),
     gasPrice: ethers.utils.parseUnits("10", "gwei"),
@@ -55,11 +49,13 @@ describe("Test univ3erc20 Functions", function () {
       overrides
     );
 
+    // standard horrible weth9 contract
     WETH9Contract = await ethers.getContractAt(
       "@uniswap/v3-periphery/contracts/interfaces/external/IWETH9.sol:IWETH9",
       "0xc778417E063141139Fce010982780140Aa0cD5Ab"
     );
 
+    // always deployed at same address
     nonfungiblePositionManagerContract = await ethers.getContractAt(
       "NonfungiblePositionManager",
       "0xC36442b4a4522E871399CD717aBDD847Ab11FE88"
@@ -70,17 +66,19 @@ describe("Test univ3erc20 Functions", function () {
       "AlchemyFactory"
     );
 
+    // this iteration of alchemy factory does not need any other implementations other than the one we're testing
     alchemyFactory = await alchemyFactoryFactory.deploy(
       "0x0000000000000000000000000000000000000000",
       "0x0000000000000000000000000000000000000000",
       "0x0000000000000000000000000000000000000000",
       univ3erc20Implementation.address,
-      owner.address
+      "0x0000000000000000000000000000000000000000"
     );
-
- });
+  });
 
   describe("NFTDaoMint()", async () => {
+
+    // here mock token is deploying the pool immediately
     it("Should deploy the pool", async () => {
       await expect(
         (deploTX = await mockTokenContract.selfDeployPool(
@@ -91,6 +89,8 @@ describe("Test univ3erc20 Functions", function () {
       ).to.emit(mockTokenContract, "PoolInitialized");
     });
 
+    // the mock token contract also mints the nonfungible position and adds liquidity which it takes from its own contract / 
+    // eth from the caller for the sake of simplicity
     it("Should mint a nonfungible liquidity position", async () => {
       await WETH9Contract.approve(
         mockTokenContract.address,
@@ -98,63 +98,97 @@ describe("Test univ3erc20 Functions", function () {
         overrides
       );
 
+      const tadrtx = await mockTokenContract.returnTokenAddresses(overrides);
+
+      var { events } = await tadrtx.wait();
+
+      let argumentToken0 = events.find(({ event }) => event == "TokenAddresses")
+        .args.token0;
+
+      console.log("EVENT ARG TOKEN: ", argumentToken0, "\n");
+
+      // check to see which token is actually assigned to 0
+      if (argumentToken0 != mockTokenContract.address) {
+        await mockTokenContract.mintNonfungibleLiquidityPosition(
+          ethers.utils.parseEther("0.001"),
+          ethers.utils.parseEther("0.1"),
+          ethers.utils.parseEther("0"),
+          ethers.utils.parseEther("0"),
+          ethers.utils.parseUnits("50000", "wei"),
+          ethers.utils.parseUnits("75000", "wei"),
+          overrides
+        );
+      } else {
+        await mockTokenContract.mintNonfungibleLiquidityPosition(
+          ethers.utils.parseEther("0.1"),
+          ethers.utils.parseEther("0.001"),
+          ethers.utils.parseEther("0"),
+          ethers.utils.parseEther("0"),
+          ethers.utils.parseUnits("50000", "wei"),
+          ethers.utils.parseUnits("75000", "wei"),
+          overrides
+        );
+      }
+
       //await WETH9Contract.transferFrom(deployingWallet.address, mockTokenContract.address, ethers.utils.parseEther("0.01"), overrides);
-      await mockTokenContract.mintNonfungibleLiquidityPosition(
-        ethers.utils.parseEther("0.03"),
-        ethers.utils.parseEther("3"),
-        ethers.utils.parseEther("0"),
-        ethers.utils.parseEther("0"),
-        ethers.utils.parseUnits("50000", "wei"),
-        ethers.utils.parseUnits("75000", "wei"),
-        overrides
-      );
     });
 
-    let univ3erc20;
+    let univ3erc20, tokenIdInput;
 
+    // lets mint the univ3erc20 contract
     it("UNIV3ERC20Mint()", async () => {
+
+      // transfer NFT from mock to owner and emit NFTTOKENID event
       const txmtx = await mockTokenContract.transferNFT(overrides);
 
-      var { events, cumulativeGasUsed, gasUsed } = await txmtx.wait();
+      var { events } = await txmtx.wait();
 
+      // get the token id
       let argumentTokenId = events.find(
         ({ event }) => event == "NFTTOKENID"
       ).args;
 
-      let tokenIdInput = argumentTokenId[0].toNumber();
+      tokenIdInput = argumentTokenId[0].toNumber();
 
       console.log("TOKEN ID INPUT: ", tokenIdInput, "\n");
 
+      // approve token transferral
       await nonfungiblePositionManagerContract.approve(
         alchemyFactory.address,
         tokenIdInput,
         overrides
       );
 
+      // mint the NFT 
       const tx = await alchemyFactory.UNIV3ERC20Mint(
         nonfungiblePositionManagerContract.address, // is constant on all networks
         owner.address,
-        1711,
+        tokenIdInput,
         "Uniswap V3 Positions NFT V1",
         "UNI-V3-POS",
         alchemyFactory.address,
         overrides
       );
 
+      // check the gas
       var { events, cumulativeGasUsed, gasUsed } = await tx.wait();
 
       console.log(`Cumulative: ${cumulativeGasUsed.toNumber()}`);
       console.log(`Gas: ${gasUsed.toNumber()}`);
       const [event] = events.filter((e) => e.event === "NewUNIV3ERC20");
-      univ3erc20 = await ethers.getContractAt("UNIV3ERC20", event.args.univ3erc20);
-
+      univ3erc20 = await ethers.getContractAt(
+        "UNIV3ERC20",
+        event.args.univ3erc20
+      );
     });
 
+    // check unimportant params
     it("Alchemy should have correct params", async () => {
       expect(await univ3erc20.name()).to.eq("Uniswap V3 Positions NFT V1");
       expect(await univ3erc20.symbol()).to.eq("UNI-V3-POS");
     });
 
+    // approve weth9 for spending from owner
     it("should approve weth9", async function () {
       await expect(
         await WETH9Contract.approve(
@@ -164,9 +198,14 @@ describe("Test univ3erc20 Functions", function () {
         )
       )
         .to.emit(WETH9Contract, "Approval")
-        .withArgs(owner.address, univ3erc20.address, ethers.utils.parseEther("1"));
+        .withArgs(
+          owner.address,
+          univ3erc20.address,
+          ethers.utils.parseEther("1")
+        );
     });
 
+    // approve mock for spending from owner ( was minted to owner at deployment )
     it("should approve mockToken", async function () {
       await expect(
         await mockTokenContract.approve(
@@ -181,19 +220,6 @@ describe("Test univ3erc20 Functions", function () {
           univ3erc20.address,
           ethers.utils.parseEther("10")
         );
-    });
-
-    // test univ3
-    it("DAO Univ3 Functions test", async () => {
-      await univ3erc20.addPortionOfCurrentLiquidity(
-        mockTokenContract.address,
-        ethers.utils.parseEther("0.001"),
-        ethers.utils.parseEther("0.1"),
-        ethers.utils.parseEther("0"),
-        ethers.utils.parseEther("0"),
-        owner.address,
-        overrides
-      );
     });
   });
 });
