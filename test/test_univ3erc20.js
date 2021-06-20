@@ -29,7 +29,7 @@ describe("Test univ3erc20 Functions", function () {
   // due to testnet, we have to specify gas limit, this is almost max on ropsten
   let overrides = {
     gasLimit: ethers.utils.parseUnits("7800000", "wei"),
-    gasPrice: ethers.utils.parseUnits("10", "gwei"),
+    gasPrice: ethers.utils.parseUnits("15", "gwei"),
   };
 
   // initial deployment of Conjure Factory
@@ -89,6 +89,8 @@ describe("Test univ3erc20 Functions", function () {
       ).to.emit(mockTokenContract, "PoolInitialized");
     });
 
+    let result;
+
     // the mock token contract also mints the nonfungible position and adds liquidity which it takes from its own contract / 
     // eth from the caller for the sake of simplicity
     it("Should mint a nonfungible liquidity position", async () => {
@@ -109,6 +111,7 @@ describe("Test univ3erc20 Functions", function () {
 
       // check to see which token is actually assigned to 0
       if (argumentToken0 != mockTokenContract.address) {
+        result = false;
         await mockTokenContract.mintNonfungibleLiquidityPosition(
           ethers.utils.parseEther("0.001"),
           ethers.utils.parseEther("0.1"),
@@ -119,6 +122,7 @@ describe("Test univ3erc20 Functions", function () {
           overrides
         );
       } else {
+        result = true;
         await mockTokenContract.mintNonfungibleLiquidityPosition(
           ethers.utils.parseEther("0.1"),
           ethers.utils.parseEther("0.001"),
@@ -220,6 +224,41 @@ describe("Test univ3erc20 Functions", function () {
           univ3erc20.address,
           ethers.utils.parseEther("10")
         );
+    });
+
+    it("should pass the following math tests", async function () {
+
+      let BalanceOne = await univ3erc20.balanceOf(owner.address);
+      BalanceOne = BalanceOne.toNumber();
+
+      let position1 = ethers.utils.parseEther("0.3");
+      let position2 = ethers.utils.parseEther("0.003");
+
+      if (!result) {
+        let positionmed = position2;
+        position2 = position1;
+        position1 = positionmed;
+      }
+
+      const firstadd = await univ3erc20._addPortionOfCurrentLiquidity(
+          position1,
+          position2,
+          ethers.utils.parseEther("0"),
+          ethers.utils.parseEther("0"),
+          owner.address
+      )
+
+      var { events } = await firstadd.wait();
+      let newLiquidity = events.find(
+        ({ event }) => event == "portionOfLiquidityAdded"
+      ).args.newLiquidity;
+      newLiquidity = newLiquidity.toNumber();
+
+
+      let BalanceTwo = await univ3erc20.balanceOf(owner.address);
+      BalanceTwo = BalanceTwo.toNumber();
+      
+      expect((TotalSharesOne + newLiquidity)).to.equal(TotalSharesTwo);
     });
   });
 });

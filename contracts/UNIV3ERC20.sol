@@ -309,8 +309,9 @@ contract UNIV3ERC20 is IERC20 {
         return tokenPool.token1();
     }
 
-    function getTotalShares() external view returns (uint128) {
-        return tokenPool.liquidity();
+    function getTotalShares() external view returns (uint128 shares) {
+        shares = tokenPool.liquidity();
+        return shares;
     }
 
     function parseRevertReason(bytes memory reason)
