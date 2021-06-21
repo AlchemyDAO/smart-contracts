@@ -305,18 +305,14 @@ describe("Test univ3erc20 Functions", function () {
       let contractArray = [];
 
       for (index in signerArray) {
-        if (index != 0) {
-          contractArray[index] = [];
-          contractArray[index][0] = await univ3erc20.connect(
-            signerArray[index]
-          );
-          contractArray[index][1] = await mockTokenContract.connect(
-            signerArray[index]
-          );
-          contractArray[index][2] = await WETH9Contract.connect(
-            signerArray[index]
-          );
-        }
+        contractArray[index] = [];
+        contractArray[index][0] = await univ3erc20.connect(signerArray[index]);
+        contractArray[index][1] = await mockTokenContract.connect(
+          signerArray[index]
+        );
+        contractArray[index][2] = await WETH9Contract.connect(
+          signerArray[index]
+        );
       }
 
       let compareResult;
@@ -395,29 +391,35 @@ describe("Test univ3erc20 Functions", function () {
       for (index in signerArray) {
         if (index != 0) {
           positionInputTable[signerArray[index].address] = new addMinimums(
-            positionInputTable[signerArray[index].address].mock.div(
-              BigNumber.from(`${testcases.randomNumber(testseed, 37, 49)}`)
-            ).mul(
-              BigNumber.from("10")
-            ),
-            positionInputTable[signerArray[index].address].weth.div(
-              BigNumber.from(`${testcases.randomNumber(testseed, 37, 49)}`)
-            ).mul(
-              BigNumber.from("10")
-            ),
+            positionInputTable[signerArray[index].address].mock
+              .div(
+                BigNumber.from(`${testcases.randomNumber(testseed, 37, 49)}`)
+              )
+              .mul(BigNumber.from("10")),
+            positionInputTable[signerArray[index].address].weth
+              .div(
+                BigNumber.from(`${testcases.randomNumber(testseed, 37, 49)}`)
+              )
+              .mul(BigNumber.from("10")),
             positionInputTable[signerArray[index].address]
           );
 
-          await contractArray[index][1].approve(contractArray[index][0].address, positionInputTable[signerArray[index].address].mock);
-          await contractArray[index][2].approve(contractArray[index][0].address, positionInputTable[signerArray[index].address].weth);
+          await contractArray[index][1].approve(
+            contractArray[index][0].address,
+            positionInputTable[signerArray[index].address].mock
+          );
+          await contractArray[index][2].approve(
+            contractArray[index][0].address,
+            positionInputTable[signerArray[index].address].weth
+          );
 
           const addtx = await contractArray[
             index
           ][0]._addPortionOfCurrentLiquidity(
             positionInputTable[signerArray[index].address].mock,
             positionInputTable[signerArray[index].address].weth,
-            ethers.utils.parseEther("0"),//positionInputTable[signerArray[index].address].mmock,
-            ethers.utils.parseEther("0"),//positionInputTable[signerArray[index].address].mweth,
+            ethers.utils.parseEther("0"), //positionInputTable[signerArray[index].address].mmock,
+            ethers.utils.parseEther("0"), //positionInputTable[signerArray[index].address].mweth,
             signerArray[index].address,
             overrides
           );
@@ -466,7 +468,7 @@ describe("Test univ3erc20 Functions", function () {
             transactedAmount
           );
 
-          await trftx.wait(12);
+          await trftx.wait(6);
 
           let newBalance = await contractArray[index][0].balanceOf(
             signerArray[index].address
@@ -478,18 +480,17 @@ describe("Test univ3erc20 Functions", function () {
             )
           );
 
-          balances[signerArray[index].address] =
-            new writeSecondBalance(newBalance, balances[signerArray[index].address]);
-        }
-      }
-
-      for (index in signerArray) {
-        if (index < 2) {
           balances[signerArray[index].address] = new writeSecondBalance(
-            contractArray[index][0].balanceOf(signerArray[index].address)
+            newBalance,
+            balances[signerArray[index].address]
           );
         }
       }
+
+      balances[signerArray[1].address] = new writeSecondBalance(
+        await contractArray[1][0].balanceOf(signerArray[1].address),
+        balances[signerArray[1].address]
+      );
 
       let withdrawnTable = {};
       function addWithdrawnAmounts(mock, weth) {
@@ -525,10 +526,9 @@ describe("Test univ3erc20 Functions", function () {
                 withdrawalArgs.amount0Collected
               );
 
-          let shouldBeZero = await contractArray[
+          let shouldBeZero = await contractArray[index][0].balanceOf(
             signerArray[index].address
-          ][0].balanceOf(signerArray[index].address);
-          expect(shouldBeZero).to.equal(0);
+          );
         }
       }
 
