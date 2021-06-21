@@ -39,6 +39,7 @@ module.exports = {
         process.env.ropstenTestWallet4,
         process.env.ropstenTestWallet5
       ],
+      timeout: 2147483647,
     },
     rinkeby: {
       url: process.env.rinkebyInfura,
@@ -50,6 +51,7 @@ module.exports = {
         process.env.rinkebyTestWallet4,
         process.env.rinkebyTestWallet5
       ],
+      timeout: 2147483647,
     },
   },
 
@@ -76,7 +78,7 @@ module.exports = {
       },
     ],
   },
-  mocha: { timeout: 999999 },
+  mocha: { timeout: 99999999 },
   // this is absolute garbage and doesn't work
   tenderly: {
     project: "spamfest",
