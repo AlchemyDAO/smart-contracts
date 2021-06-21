@@ -12,7 +12,6 @@ import {
 import {
     INonfungiblePositionManager
 } from "@uniswap/v3-periphery/contracts/interfaces/INonfungiblePositionManager.sol";
-import {Quoter} from "@uniswap/v3-periphery/contracts/lens/Quoter.sol";
 import {
     IUniswapV3Pool
 } from "@uniswap/v3-core/contracts/interfaces/IUniswapV3Pool.sol";
@@ -120,7 +119,7 @@ contract UNIV3ERC20 is IERC20 {
             ,
             ,
 
-        ) = positionManager.positions(tokenId_);
+        ) = positionManager.positions(nonfungiblePosition.tokenid);
 
         // mint the owner of the NFT exactly as many shares as there is liquidity
         _mint(owner_, currentLiquidity);
@@ -152,7 +151,7 @@ contract UNIV3ERC20 is IERC20 {
 
     event portionOfLiquidityAdded(
         address account,
-        uint256 sharesReceived,
+        uint256 newLiquidity,
         uint256 amount0Added,
         uint256 amount1Added
     );
@@ -197,21 +196,24 @@ contract UNIV3ERC20 is IERC20 {
         token0.safeTransferFrom(recipient, address(this), amount0ToTrySpend);
         token1.safeTransferFrom(recipient, address(this), amount1ToTrySpend);
 
-        token0.call(
-            abi.encodeWithSignature(
-                "approve(address,uint256)",
-                address(positionManager),
-                amount0ToTrySpend
-            )
-        );
+        token0.safeApprove(address(positionManager), amount0ToTrySpend);
+        token1.safeApprove(address(positionManager), amount1ToTrySpend);
 
-        token1.call(
-            abi.encodeWithSignature(
-                "approve(address,uint256)",
-                address(positionManager),
-                amount1ToTrySpend
-            )
-        );
+      // token0.call(
+      //     abi.encodeWithSignature(
+      //         "approve(address,uint256)",
+      //         address(positionManager),
+      //         amount0ToTrySpend
+      //     )
+      // );
+//
+      // token1.call(
+      //     abi.encodeWithSignature(
+      //         "approve(address,uint256)",
+      //         address(positionManager),
+      //         amount1ToTrySpend
+      //     )
+      // );
 
         // amount0 and amount1 actually added
 
@@ -223,7 +225,7 @@ contract UNIV3ERC20 is IERC20 {
                     amount1Desired: amount1ToTrySpend,
                     amount0Min: amount0MinToSpend,
                     amount1Min: amount1MinToSpend,
-                    deadline: block.timestamp
+                    deadline: block.timestamp + 2 minutes
                 })
             );
 
@@ -264,21 +266,15 @@ contract UNIV3ERC20 is IERC20 {
         _balances[recipient_] = balance.sub(burnerShares);
         _burn(burnerShares);
 
-        (, , , , , , , uint128 currentLiquidity, , , , ) =
-            positionManager.positions(nonfungiblePosition.tokenid);
-
-        // new lower liquidity
-        uint128 newLiquidity = uint128(currentLiquidity.sub(burnerShares));
-
         //  Decrease liquidity, tokens are accounted to position.
         (uint256 amount0, uint256 amount1) =
             positionManager.decreaseLiquidity(
                 INonfungiblePositionManager.DecreaseLiquidityParams({
                     tokenId: nonfungiblePosition.tokenid,
-                    liquidity: newLiquidity, // apparently it will exactly reduce the amount of liquidity but then possibly not give you all of the tokens back, // so sadly it can't be compensated in shares
+                    liquidity: burnerShares, 
                     amount0Min: minimumToken0Out, // min out
                     amount1Min: minimumToken1Out, // min out
-                    deadline: block.timestamp // will look into
+                    deadline: block.timestamp + 2 minutes// will look into
                 })
             );
 
