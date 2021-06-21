@@ -393,12 +393,12 @@ describe("Test univ3erc20 Functions", function () {
           positionInputTable[signerArray[index].address] = new addMinimums(
             positionInputTable[signerArray[index].address].mock
               .div(
-                BigNumber.from(`${testcases.randomNumber(testseed, 37, 49)}`)
+                BigNumber.from(`${testcases.randomNumber(testseed, 100037, 100049)}`)
               )
               .mul(BigNumber.from("10")),
             positionInputTable[signerArray[index].address].weth
               .div(
-                BigNumber.from(`${testcases.randomNumber(testseed, 37, 49)}`)
+                BigNumber.from(`${testcases.randomNumber(testseed, 100037, 100049)}`)
               )
               .mul(BigNumber.from("10")),
             positionInputTable[signerArray[index].address]
@@ -418,8 +418,8 @@ describe("Test univ3erc20 Functions", function () {
           ][0]._addPortionOfCurrentLiquidity(
             positionInputTable[signerArray[index].address].mock,
             positionInputTable[signerArray[index].address].weth,
-            ethers.utils.parseEther("0"), //positionInputTable[signerArray[index].address].mmock,
-            ethers.utils.parseEther("0"), //positionInputTable[signerArray[index].address].mweth,
+            positionInputTable[signerArray[index].address].mmock,
+            positionInputTable[signerArray[index].address].mweth,
             signerArray[index].address,
             overrides
           );
@@ -525,10 +525,6 @@ describe("Test univ3erc20 Functions", function () {
                 withdrawalArgs.amount1Collected,
                 withdrawalArgs.amount0Collected
               );
-
-          let shouldBeZero = await contractArray[index][0].balanceOf(
-            signerArray[index].address
-          );
         }
       }
 

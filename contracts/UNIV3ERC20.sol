@@ -103,7 +103,6 @@ contract UNIV3ERC20 is IERC20 {
         _name = name_;
         _symbol = symbol_;
 
-
         // data taken from tuple we need for init / minting
 
         (
@@ -162,6 +161,7 @@ contract UNIV3ERC20 is IERC20 {
      * @param amount1ToTrySpend max token1 to try and spend
      * @param amount0MinToSpend min token0 to try and spend
      * @param amount1MinToSpend min token1 to try and spend
+     * @param recipient sender
      * */
     function _addPortionOfCurrentLiquidity(
         uint256 amount0ToTrySpend,
@@ -170,13 +170,12 @@ contract UNIV3ERC20 is IERC20 {
         uint256 amount1MinToSpend,
         address recipient
     ) external {
-
         (, , address token0, address token1, , , , , , , , ) =
             positionManager.positions(nonfungiblePosition.tokenid);
 
         // include a block like this if you want to shift the logic of checking for token (because token assignment is according
         // to size of address so really undecidable by you) to solidity, just that this is inefficient gas-wise
-        //  if (!(some condition)) { 
+        //  if (!(some condition)) {
         //      (
         //          amount0ToTrySpend,
         //          amount1ToTrySpend,
@@ -198,24 +197,6 @@ contract UNIV3ERC20 is IERC20 {
 
         token0.safeApprove(address(positionManager), amount0ToTrySpend);
         token1.safeApprove(address(positionManager), amount1ToTrySpend);
-
-      // token0.call(
-      //     abi.encodeWithSignature(
-      //         "approve(address,uint256)",
-      //         address(positionManager),
-      //         amount0ToTrySpend
-      //     )
-      // );
-//
-      // token1.call(
-      //     abi.encodeWithSignature(
-      //         "approve(address,uint256)",
-      //         address(positionManager),
-      //         amount1ToTrySpend
-      //     )
-      // );
-
-        // amount0 and amount1 actually added
 
         (uint128 newLiquidity, uint256 amount0, uint256 amount1) =
             positionManager.increaseLiquidity(
@@ -251,6 +232,7 @@ contract UNIV3ERC20 is IERC20 {
      * @param burnerShares amount of shares to be burned
      * @param minimumToken0Out min amount of token 0 you want back
      * @param minimumToken1Out min amount of token 0 you want back
+     * @param recipient_ the account to receive the tokens
      * */
     function _withdrawPortionOfCurrentLiquidity(
         uint128 burnerShares,
@@ -258,7 +240,6 @@ contract UNIV3ERC20 is IERC20 {
         uint256 minimumToken1Out,
         address recipient_
     ) external {
-
         uint256 balance = balanceOf(recipient_);
         require(balance >= burnerShares, "Can't burn more than you have");
 
@@ -271,10 +252,10 @@ contract UNIV3ERC20 is IERC20 {
             positionManager.decreaseLiquidity(
                 INonfungiblePositionManager.DecreaseLiquidityParams({
                     tokenId: nonfungiblePosition.tokenid,
-                    liquidity: burnerShares, 
+                    liquidity: burnerShares,
                     amount0Min: minimumToken0Out, // min out
                     amount1Min: minimumToken1Out, // min out
-                    deadline: block.timestamp + 2 minutes// will look into
+                    deadline: block.timestamp + 2 minutes // will look into
                 })
             );
 
@@ -297,19 +278,31 @@ contract UNIV3ERC20 is IERC20 {
         );
     }
 
+    /**
+     * returns address of token0
+     */
     function getToken0() external view returns (address) {
         return tokenPool.token0();
     }
 
+    /**
+     * returns address of token1
+     */
     function getToken1() external view returns (address) {
         return tokenPool.token1();
     }
 
+    /**
+     * returns total shares which equal liquidity of position
+     */
     function getTotalShares() external view returns (uint128 shares) {
         shares = tokenPool.liquidity();
         return shares;
     }
 
+    /**
+     * @notice internal function to help with error handling for quoting functions
+     */
     function parseRevertReason(bytes memory reason)
         internal
         pure
@@ -325,6 +318,9 @@ contract UNIV3ERC20 is IERC20 {
         return abi.decode(reason, (uint256));
     }
 
+    /**
+     * @notice see liquidity addition, amount of liquidity added can be found through events
+     */
     function quoteLiquidityAddition(
         uint256 amount0ToTrySpend,
         uint256 amount1ToTrySpend,
@@ -344,6 +340,9 @@ contract UNIV3ERC20 is IERC20 {
         }
     }
 
+    /**
+     * @notice see liquidity withdrawal, amount of liquidity added can be found through events
+     */
     function quoteLiquidityWithdrawal(
         uint128 burnerShares,
         uint256 minimumToken0Out,
