@@ -111,6 +111,7 @@ describe("Test Alchemy Functions", function () {
               5,
               0
           );
+
           const { events, cumulativeGasUsed, gasUsed } = await tx.wait();
           console.log(`Cumulative: ${cumulativeGasUsed.toNumber()}`);
           console.log(`Gas: ${gasUsed.toNumber()}`)
@@ -352,8 +353,6 @@ describe("Test Alchemy Functions", function () {
 
 
           await alchemy.buyShares("500000000000000000", overrides)
-
-
 
           shares = await alchemy._sharesForSale()
           expect (shares).to.be.equal("500000000000000000")

@@ -19,6 +19,7 @@ contract AlchemyFactory {
     address payable public factoryOwner;
     address payable public alchemyRouter;
     address public alchemyImplementation;
+    address public univ3erc20Implementation;
     address public governorAlphaImplementation;
     address public timelockImplementation;
 
@@ -26,6 +27,7 @@ contract AlchemyFactory {
         address _alchemyImplementation,
         address _governorAlphaImplementation,
         address _timelockImplementation,
+        address _univ3erc20Implementation,
         address payable _alchemyRouter
     )
     {
@@ -34,6 +36,7 @@ contract AlchemyFactory {
         governorAlphaImplementation = _governorAlphaImplementation;
         timelockImplementation = _timelockImplementation;
         alchemyRouter =_alchemyRouter;
+        univ3erc20Implementation = _univ3erc20Implementation;
     }
 
     /**
@@ -97,6 +100,41 @@ contract AlchemyFactory {
         );
     }
 
+    event NewUNIV3ERC20(address univ3erc20);
+
+    function UNIV3ERC20Mint(
+        address nftAddress_,
+        address owner_,
+        uint256 tokenId_,
+        string memory name_,
+        string memory symbol_,
+        address factoryAddress_
+    ) external returns (address univ3erc20) {
+
+        univ3erc20 = univ3erc20Implementation.createClone();
+
+        emit NewUNIV3ERC20(univ3erc20);
+
+        // transfer nft
+        nftAddress_.call(
+            abi.encodeWithSignature(
+                "transferFrom(address,address,uint256)",
+                msg.sender,
+                univ3erc20,
+                tokenId_
+            )
+        );
+
+        IUNIV3ERC20(univ3erc20).initialize(
+            IERC721(nftAddress_),
+            owner_,
+            tokenId_,
+            name_,
+            symbol_,
+            factoryAddress_
+        );
+    }
+
     /**
      * @dev lets the owner change the ownership to another address
      *
@@ -115,6 +153,15 @@ contract AlchemyFactory {
     function newAlchemyImplementation(address newAlchemyImplementation_) external {
         require(msg.sender == factoryOwner, "Only owner");
         alchemyImplementation = newAlchemyImplementation_;
+    }
+
+    /**
+     * @dev lets the owner change the address to another address
+     * @param newUniv3erc20Implementation_ the new address
+    */
+    function newUniv3erc20Implementation(address newUniv3erc20Implementation_) external {
+        require(msg.sender == factoryOwner, "Only owner");
+        univ3erc20Implementation = newUniv3erc20Implementation_;
     }
 
     /**
@@ -173,6 +220,16 @@ interface IAlchemy {
     ) external;
 }
 
+interface IUNIV3ERC20 {
+    function initialize(
+        IERC721 nftAddress_,
+        address owner_,
+        uint256 tokenId_,
+        string memory name_,
+        string memory symbol_,
+        address factoryContract
+    ) external;
+}
 
 interface IGovernorAlpha {
     function initialize(
